@@ -17,6 +17,7 @@ package org.odk.collect.android.activities;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.Button;
@@ -419,6 +420,7 @@ public class GeoPolyActivity extends BaseGeoMapActivity implements SettingsDialo
         MapPoint point = map.getGpsLocation();
         if (point != null && isLocationAcceptable(point)) {
             map.appendPointToPoly(featureId, point);
+            // Log.i("MyLocation",point.toString());
             updateUi();
         }
     }
