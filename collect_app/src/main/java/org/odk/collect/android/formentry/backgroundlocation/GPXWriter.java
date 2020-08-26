@@ -9,6 +9,10 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 
+import org.odk.collect.android.application.Collect;
+import org.odk.collect.android.storage.StoragePathProvider;
+import org.odk.collect.android.storage.StorageSubdirectory;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -99,8 +103,12 @@ public class GPXWriter extends Service {
         SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy_HH-mm-ss");
         String filename= formatter.format(date)+".gpx";
         File dir = getApplicationContext().getExternalFilesDir("myDir");
-        Log.e(TAG, dir.toString());
-        File file = new File(dir, filename);
+        StoragePathProvider storagePathProvider = new StoragePathProvider();
+        String dir2 = storagePathProvider.getUnscopedStorageDirPath(StorageSubdirectory.INSTANCES)+"/GPSTraces";
+        File folder = new File(dir2);
+        folder.mkdir();
+        Log.e(TAG, folder.toString());
+        File file = new File(folder, filename);
         try {
             writer = new FileWriter(file);
             writer.append(fileheader);
