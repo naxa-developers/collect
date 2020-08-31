@@ -14,6 +14,7 @@
 
 package org.odk.collect.android.activities;
 
+import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -46,6 +47,7 @@ import org.odk.collect.android.configure.qr.QRCodeTabsActivity;
 import org.odk.collect.android.dao.InstancesDao;
 import org.odk.collect.android.formentry.backgroundlocation.GPXWriter;
 import org.odk.collect.android.injection.DaggerUtils;
+import org.odk.collect.android.listeners.PermissionListener;
 import org.odk.collect.android.preferences.AdminKeys;
 import org.odk.collect.android.preferences.AdminPasswordDialogFragment;
 import org.odk.collect.android.preferences.AdminPasswordDialogFragment.Action;
@@ -63,6 +65,7 @@ import org.odk.collect.android.utilities.AdminPasswordProvider;
 import org.odk.collect.android.utilities.ApplicationConstants;
 import org.odk.collect.android.utilities.DialogUtils;
 import org.odk.collect.android.utilities.MultiClickGuard;
+import org.odk.collect.android.utilities.PermissionUtils;
 import org.odk.collect.android.utilities.PlayServicesChecker;
 import org.odk.collect.android.utilities.ToastUtils;
 import org.odk.collect.material.MaterialBanner;
@@ -127,6 +130,8 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
 
     @Inject
     SettingsImporter settingsImporter;
+
+
 
     @Inject
     MainMenuViewModel.Factory viewModelFactory;
@@ -346,6 +351,7 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
                 }
                 return true;
             case R.id.menu_start_log:
+
                 if(GPXWriter.isServiceRunning){
                     stopService(new Intent(this, GPXWriter.class));
                 }else {

@@ -66,12 +66,54 @@ public class SplashScreenActivity extends Activity {
     @Inject
     GeneralSharedPreferences generalSharedPreferences;
 
+    private void checkforLocationPermission(){
+        permissionUtils.requestLocationPermissions(this, new PermissionListener() {
+            @Override
+            public void granted() {}
+
+            @Override
+            public void denied() {
+            }
+        });
+    }
+
+    private boolean checkforStoragePermission(){
+        final boolean[] result = {false};
+        permissionUtils.requestStoragePermissions(this, new PermissionListener() {
+            @Override
+            public void granted() {
+                result[0] = true;
+            }
+
+            @Override
+            public void denied() {
+                // The activity has to finish because ODK Collect cannot function without these permissions.
+                result[0] = false;
+            }
+        });
+        return result[0];
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // this splash screen should be a blank slate
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         DaggerUtils.getComponent(this).inject(this);
+
+//        if( checkforLocationPermission() && checkforStoragePermission()){
+//            try {
+//                new StorageInitializer().createOdkDirsOnStorage();
+//            } catch (RuntimeException e) {
+//                DialogUtils.showDialog(DialogUtils.createErrorDialog(SplashScreenActivity.this,
+//                        e.getMessage(), EXIT), SplashScreenActivity.this);
+//                return;
+//            }
+//
+//            init();
+//        }else{
+//            finish();
+//        }
 
         permissionUtils.requestStoragePermissions(this, new PermissionListener() {
             @Override
@@ -94,6 +136,7 @@ public class SplashScreenActivity extends Activity {
                 finish();
             }
         });
+
     }
 
     private void init() {

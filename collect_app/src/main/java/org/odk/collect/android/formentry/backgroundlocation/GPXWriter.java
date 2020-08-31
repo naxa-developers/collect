@@ -1,5 +1,6 @@
 package org.odk.collect.android.formentry.backgroundlocation;
 
+import android.app.Activity;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -8,10 +9,13 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.odk.collect.android.application.Collect;
+import org.odk.collect.android.listeners.PermissionListener;
 import org.odk.collect.android.storage.StoragePathProvider;
 import org.odk.collect.android.storage.StorageSubdirectory;
+import org.odk.collect.android.utilities.PermissionUtils;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -26,6 +30,7 @@ public class GPXWriter extends Service {
     private static final int LOCATION_INTERVAL = 1000;
     private static final float LOCATION_DISTANCE = 10f;
     private FileWriter writer;
+    private PermissionUtils myPermissions;
     private Date date = new Date();
     private SimpleDateFormat xmldatadateformatter = new SimpleDateFormat("yyyy-MM-dd");
     private SimpleDateFormat xmldatatimeformatter = new SimpleDateFormat("HH:mm:ss");
@@ -104,7 +109,7 @@ public class GPXWriter extends Service {
         String filename= formatter.format(date)+".gpx";
         File dir = getApplicationContext().getExternalFilesDir("myDir");
         StoragePathProvider storagePathProvider = new StoragePathProvider();
-        String dir2 = storagePathProvider.getUnscopedStorageDirPath(StorageSubdirectory.INSTANCES)+"/GPSTraces";
+        String dir2 = storagePathProvider.getUnscopedStorageDirPath(StorageSubdirectory.GPS_TRACES);
         File folder = new File(dir2);
         folder.mkdir();
         Log.e(TAG, folder.toString());
@@ -135,14 +140,15 @@ public class GPXWriter extends Service {
 
     @Override
     public void onDestroy() {
-        Log.e(TAG, "onDestroy");
         super.onDestroy();
-        try {
-            writer.append(filefooter);
-            writer.flush();
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if(writer != null){
+            try {
+                writer.append(filefooter);
+                writer.flush();
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         isServiceRunning = false;
         if (mLocationManager != null) {
@@ -154,6 +160,7 @@ public class GPXWriter extends Service {
                 }
             }
         }
+        Log.e(TAG, "onDestroy");
     }
 
     private void initializeLocationManager() {

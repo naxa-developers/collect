@@ -6,6 +6,7 @@ public enum StorageSubdirectory {
     CACHE(".cache"),
     METADATA("metadata"),
     LAYERS("layers"),
+    GPS_TRACES("GPSTraces"),
     SETTINGS("settings");
 
     private String directoryName;
