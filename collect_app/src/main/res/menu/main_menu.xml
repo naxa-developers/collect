@@ -35,5 +35,9 @@ limitations under the License.
         android:id="@+id/menu_configure_qr_code"
         android:title="@string/configure_via_qr_code"
         app:showAsAction="never"/>
+    <item
+        android:id="@+id/menu_start_log"
+        android:title="Start/Stop Tracking"
+        app:showAsAction="never"/>
 
 </menu>

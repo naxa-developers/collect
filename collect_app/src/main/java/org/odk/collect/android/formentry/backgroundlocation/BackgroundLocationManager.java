@@ -1,6 +1,7 @@
 package org.odk.collect.android.formentry.backgroundlocation;
 
 import android.location.Location;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -11,6 +12,8 @@ import org.odk.collect.android.location.client.LocationClient;
 import org.odk.collect.android.formentry.audit.AuditConfig;
 import org.odk.collect.android.formentry.audit.AuditEvent;
 import org.odk.collect.android.logic.actions.setgeopoint.CollectSetGeopointAction;
+
+import timber.log.Timber;
 
 /**
  * Manages background location for the location audit logging and odk:setgeopoint action features.
@@ -242,6 +245,7 @@ public class BackgroundLocationManager implements LocationClient.LocationClientL
     public void onLocationChanged(Location location) {
         switch (currentState) {
             case RECEIVING_LOCATIONS:
+                Log.i("MyLocation",location.toString());
                 helper.provideLocationToAuditLogger(location);
         }
     }

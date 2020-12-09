@@ -21,6 +21,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -35,6 +36,7 @@ import androidx.loader.content.Loader;
 import org.odk.collect.android.R;
 import org.odk.collect.android.adapters.FormListAdapter;
 import org.odk.collect.android.dao.FormsDao;
+import org.odk.collect.android.formentry.backgroundlocation.GPXWriter;
 import org.odk.collect.android.formmanagement.BlankFormListMenuDelegate;
 import org.odk.collect.android.formmanagement.BlankFormsListViewModel;
 import org.odk.collect.android.injection.DaggerUtils;
@@ -78,6 +80,9 @@ public class FillBlankFormActivity extends FormListActivity implements
     PreferencesProvider preferencesProvider;
 
     @Inject
+    PermissionUtils permissionUtils;
+
+    @Inject
     Scheduler scheduler;
 
     @Inject
@@ -90,6 +95,22 @@ public class FillBlankFormActivity extends FormListActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.form_chooser_list);
         DaggerUtils.getComponent(this).inject(this);
+        Log.e("GPXWRITER","should ask location permission");
+        permissionUtils.requestLocationPermissions(this, new PermissionListener() {
+            @Override
+            public void granted() {
+                if(GPXWriter.isServiceRunning){
+                    stopService(new Intent(getApplicationContext(),GPXWriter.class));
+                }else {
+                    startService(new Intent(getApplicationContext(), GPXWriter.class));
+                }
+            }
+
+            @Override
+            public void denied() {
+                finish();
+            }
+        });
 
         setTitle(getString(R.string.enter_data));
 
@@ -187,15 +208,19 @@ public class FillBlankFormActivity extends FormListActivity implements
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
         if (MultiClickGuard.allowClick(getClass().getName())) {
+
+            Log.e("ACTIVITY_CHECK","1");
             // get uri to form
             long idFormsTable = listView.getAdapter().getItemId(position);
             Uri formUri = ContentUris.withAppendedId(FormsColumns.CONTENT_URI, idFormsTable);
 
             String action = getIntent().getAction();
             if (Intent.ACTION_PICK.equals(action)) {
+                Log.e("ACTIVITY_CHECK","2");
                 // caller is waiting on a picked form
                 setResult(RESULT_OK, new Intent().setData(formUri));
             } else {
+                Log.e("ACTIVITY_CHECK","3");
                 // caller wants to view/edit a form, so launch formentryactivity
                 Intent intent = new Intent(Intent.ACTION_EDIT, formUri);
                 intent.putExtra(ApplicationConstants.BundleKeys.FORM_MODE, ApplicationConstants.FormModes.EDIT_SAVED);

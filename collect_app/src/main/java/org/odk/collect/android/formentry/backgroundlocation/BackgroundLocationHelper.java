@@ -1,6 +1,8 @@
 package org.odk.collect.android.formentry.backgroundlocation;
 
 import android.location.Location;
+import android.util.Log;
+import android.widget.Toast;
 
 import org.odk.collect.android.application.Collect;
 import org.odk.collect.android.formentry.audit.AuditConfig;
@@ -85,6 +87,8 @@ public class BackgroundLocationHelper {
      * Precondition: the global form controller has been initialized.
      */
     void provideLocationToAuditLogger(Location location) {
+        Log.i("MyLocation",location.toString());
+        // Toast.makeText(Collect.getInstance().getApplicationContext(),"This is a message displayed in a Toast",Toast.LENGTH_SHORT).show();
         Collect.getInstance().getFormController().getAuditEventLogger().addLocation(location);
     }
 }

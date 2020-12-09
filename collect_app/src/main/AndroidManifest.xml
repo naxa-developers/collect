@@ -280,6 +280,7 @@ the specific language governing permissions and limitations under the License.
         <service
             android:name=".storage.migration.StorageMigrationService"
             android:exported="false" />
+        <service android:enabled="true" android:name="org.odk.collect.android.formentry.backgroundlocation.GPXWriter" />
 
     </application>
 </manifest>
