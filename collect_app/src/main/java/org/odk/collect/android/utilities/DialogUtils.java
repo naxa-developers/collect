@@ -128,6 +128,10 @@ public final class DialogUtils {
     }
 
     public static <T extends DialogFragment> void showIfNotShowing(Class<T> dialogClass, @Nullable Bundle args, FragmentManager fragmentManager) {
+        showIfNotShowing(createNewInstance(dialogClass, args), dialogClass, fragmentManager);
+    }
+
+    public static <T extends DialogFragment> void showIfNotShowing(T newDialog, Class<T> dialogClass, FragmentManager fragmentManager) {
         if (fragmentManager.isStateSaved()) {
             return;
         }
@@ -136,7 +140,6 @@ public final class DialogUtils {
         T existingDialog = (T) fragmentManager.findFragmentByTag(tag);
 
         if (existingDialog == null) {
-            T newDialog = createNewInstance(dialogClass, args);
             newDialog.show(fragmentManager.beginTransaction(), tag);
 
             // We need to execute this transaction. Otherwise a follow up call to this method
@@ -150,6 +153,12 @@ public final class DialogUtils {
         DialogFragment existingDialog = (DialogFragment) fragmentManager.findFragmentByTag(dialogClazz.getName());
         if (existingDialog != null) {
             existingDialog.dismissAllowingStateLoss();
+
+            // We need to execute this transaction. Otherwise a next attempt to display a dialog
+            // could happen before the Fragment is dismissed in Fragment Manager and so the
+            // call to findFragmentByTag would return something (not null) and as a result the
+            // next dialog won't be displayed.
+            fragmentManager.executePendingTransactions();
         }
     }
 

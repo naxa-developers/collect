@@ -18,8 +18,9 @@ import org.odk.collect.android.forms.FormsRepository;
 import org.odk.collect.android.injection.config.AppDependencyModule;
 import org.odk.collect.android.instances.InstancesRepository;
 import org.odk.collect.android.notifications.Notifier;
-import org.odk.collect.android.openrosa.api.FormApiException;
+import org.odk.collect.android.forms.FormSourceException;
 import org.odk.collect.android.preferences.GeneralSharedPreferences;
+import org.odk.collect.android.preferences.PreferencesProvider;
 import org.odk.collect.android.support.BooleanChangeLock;
 import org.odk.collect.android.support.RobolectricHelpers;
 import org.robolectric.RobolectricTestRunner;
@@ -61,7 +62,7 @@ public class SyncFormsTaskSpecTest {
             }
 
             @Override
-            public Notifier providesNotifier(Application application) {
+            public Notifier providesNotifier(Application application, PreferencesProvider preferencesProvider) {
                 return notifier;
             }
 
@@ -98,7 +99,7 @@ public class SyncFormsTaskSpecTest {
 
     @Test
     public void whenSynchronizingFails_setsRepositoryToNotSyncingAndNotifiesWithError() throws Exception {
-        FormApiException exception = new FormApiException(FormApiException.Type.FETCH_ERROR);
+        FormSourceException exception = new FormSourceException(FormSourceException.Type.FETCH_ERROR);
         doThrow(exception).when(serverFormsSynchronizer).synchronize();
         InOrder inOrder = inOrder(syncStatusRepository, serverFormsSynchronizer);
 
@@ -115,7 +116,7 @@ public class SyncFormsTaskSpecTest {
 
     @Test
     public void whenSynchronizingFails_logsAnalytics() throws Exception {
-        FormApiException exception = new FormApiException(FormApiException.Type.FETCH_ERROR);
+        FormSourceException exception = new FormSourceException(FormSourceException.Type.FETCH_ERROR);
         doThrow(exception).when(serverFormsSynchronizer).synchronize();
 
         SyncFormsTaskSpec taskSpec = new SyncFormsTaskSpec();

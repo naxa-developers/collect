@@ -35,15 +35,17 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
 import androidx.lifecycle.ViewModelProviders;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import org.odk.collect.android.R;
 import org.odk.collect.android.activities.viewmodels.MainMenuViewModel;
 import org.odk.collect.android.analytics.Analytics;
-import org.odk.collect.android.analytics.AnalyticsEvents;
 import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.configure.LegacySettingsFileReader;
 import org.odk.collect.android.configure.SettingsImporter;
+import org.odk.collect.android.configure.legacy.LegacySettingsFileImporter;
 import org.odk.collect.android.configure.qr.QRCodeTabsActivity;
 import org.odk.collect.android.dao.InstancesDao;
+import org.odk.collect.android.gdrive.GoogleDriveActivity;
 import org.odk.collect.android.injection.DaggerUtils;
 import org.odk.collect.android.preferences.AdminKeys;
 import org.odk.collect.android.preferences.AdminPasswordDialogFragment;
@@ -150,11 +152,9 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
         enterDataButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (MultiClickGuard.allowClick(getClass().getName())) {
-                    Intent i = new Intent(getApplicationContext(),
-                            FillBlankFormActivity.class);
-                    startActivity(i);
-                }
+                Intent i = new Intent(getApplicationContext(),
+                        FillBlankFormActivity.class);
+                startActivity(i);
             }
         });
 
@@ -164,12 +164,10 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
         reviewDataButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (MultiClickGuard.allowClick(getClass().getName())) {
-                    Intent i = new Intent(getApplicationContext(), InstanceChooserList.class);
-                    i.putExtra(ApplicationConstants.BundleKeys.FORM_MODE,
-                            ApplicationConstants.FormModes.EDIT_SAVED);
-                    startActivity(i);
-                }
+                Intent i = new Intent(getApplicationContext(), InstanceChooserList.class);
+                i.putExtra(ApplicationConstants.BundleKeys.FORM_MODE,
+                        ApplicationConstants.FormModes.EDIT_SAVED);
+                startActivity(i);
             }
         });
 
@@ -179,11 +177,9 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
         sendDataButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (MultiClickGuard.allowClick(getClass().getName())) {
-                    Intent i = new Intent(getApplicationContext(),
-                            InstanceUploaderListActivity.class);
-                    startActivity(i);
-                }
+                Intent i = new Intent(getApplicationContext(),
+                        InstanceUploaderListActivity.class);
+                startActivity(i);
             }
         });
 
@@ -192,12 +188,10 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
         viewSentFormsButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (MultiClickGuard.allowClick(getClass().getName())) {
-                    Intent i = new Intent(getApplicationContext(), InstanceChooserList.class);
-                    i.putExtra(ApplicationConstants.BundleKeys.FORM_MODE,
-                            ApplicationConstants.FormModes.VIEW_SENT);
-                    startActivity(i);
-                }
+                Intent i = new Intent(getApplicationContext(), InstanceChooserList.class);
+                i.putExtra(ApplicationConstants.BundleKeys.FORM_MODE,
+                        ApplicationConstants.FormModes.VIEW_SENT);
+                startActivity(i);
             }
         });
 
@@ -207,26 +201,24 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
         getFormsButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (MultiClickGuard.allowClick(getClass().getName())) {
-                    SharedPreferences sharedPreferences = PreferenceManager
-                            .getDefaultSharedPreferences(MainMenuActivity.this);
-                    String protocol = sharedPreferences.getString(
-                            GeneralKeys.KEY_PROTOCOL, getString(R.string.protocol_odk_default));
-                    Intent i = null;
-                    if (protocol.equalsIgnoreCase(getString(R.string.protocol_google_sheets))) {
-                        if (new PlayServicesChecker().isGooglePlayServicesAvailable(MainMenuActivity.this)) {
-                            i = new Intent(getApplicationContext(),
-                                    GoogleDriveActivity.class);
-                        } else {
-                            new PlayServicesChecker().showGooglePlayServicesAvailabilityErrorDialog(MainMenuActivity.this);
-                            return;
-                        }
-                    } else {
+                SharedPreferences sharedPreferences = PreferenceManager
+                        .getDefaultSharedPreferences(MainMenuActivity.this);
+                String protocol = sharedPreferences.getString(
+                        GeneralKeys.KEY_PROTOCOL, getString(R.string.protocol_odk_default));
+                Intent i = null;
+                if (protocol.equalsIgnoreCase(getString(R.string.protocol_google_sheets))) {
+                    if (new PlayServicesChecker().isGooglePlayServicesAvailable(MainMenuActivity.this)) {
                         i = new Intent(getApplicationContext(),
-                                FormDownloadListActivity.class);
+                                GoogleDriveActivity.class);
+                    } else {
+                        new PlayServicesChecker().showGooglePlayServicesAvailabilityErrorDialog(MainMenuActivity.this);
+                        return;
                     }
-                    startActivity(i);
+                } else {
+                    i = new Intent(getApplicationContext(),
+                            FormDownloadListActivity.class);
                 }
+                startActivity(i);
             }
         });
 
@@ -236,11 +228,9 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
         manageFilesButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (MultiClickGuard.allowClick(getClass().getName())) {
-                    Intent i = new Intent(getApplicationContext(),
-                            DeleteSavedFormActivity.class);
-                    startActivity(i);
-                }
+                Intent i = new Intent(getApplicationContext(),
+                        DeleteSavedFormActivity.class);
+                startActivity(i);
             }
         });
 
@@ -261,7 +251,18 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
             return;
         }
 
-        importSettingsFromLegacyFiles();
+        LegacySettingsFileImporter legacySettingsFileImporter = new LegacySettingsFileImporter(storagePathProvider, analytics, settingsImporter);
+        if (legacySettingsFileImporter.importFromFile()) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.successfully_imported_settings)
+                    .setMessage(R.string.settings_successfully_loaded_file_notification)
+                    .setPositiveButton(R.string.ok, (dialog, which) -> {
+                        dialog.dismiss();
+                        recreate();
+                    })
+                    .setCancelable(false)
+                    .create().show();
+        }
     }
 
     @Override
@@ -277,6 +278,7 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
         setButtonsVisibility();
         invalidateOptionsMenu();
         setUpStorageMigrationBanner();
+        tryToPerformAutomaticMigration();
     }
 
     private void setButtonsVisibility() {
@@ -317,10 +319,12 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (!MultiClickGuard.allowClick(getClass().getName())) {
+            return true;
+        }
+
         switch (item.getItemId()) {
             case R.id.menu_configure_qr_code:
-                analytics.logEvent(AnalyticsEvents.SCAN_QR_CODE, "MainMenu");
-
                 if (adminPasswordProvider.isAdminPasswordSet()) {
                     Bundle args = new Bundle();
                     args.putSerializable(AdminPasswordDialogFragment.ARG_ACTION, Action.SCAN_QR_CODE);
@@ -429,8 +433,7 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
             }
         } else {
             sendDataButton.setText(getString(R.string.send_data));
-            Timber.w("Cannot update \"Send Finalized\" button label since the database is closed. "
-                    + "Perhaps the app is running in the background?");
+            Timber.w("Cannot update \"Send Finalized\" button label since the database is closed. Perhaps the app is running in the background?");
         }
 
         if (savedCursor != null && !savedCursor.isClosed()) {
@@ -444,8 +447,7 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
             }
         } else {
             reviewDataButton.setText(getString(R.string.review_data));
-            Timber.w("Cannot update \"Edit Form\" button label since the database is closed. "
-                    + "Perhaps the app is running in the background?");
+            Timber.w("Cannot update \"Edit Form\" button label since the database is closed. Perhaps the app is running in the background?");
         }
 
         if (viewSentCursor != null && !viewSentCursor.isClosed()) {
@@ -459,8 +461,7 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
             }
         } else {
             viewSentFormsButton.setText(getString(R.string.view_sent_forms));
-            Timber.w("Cannot update \"View Sent\" button label since the database is closed. "
-                    + "Perhaps the app is running in the background?");
+            Timber.w("Cannot update \"View Sent\" button label since the database is closed. Perhaps the app is running in the background?");
         }
     }
 
@@ -571,20 +572,12 @@ public class MainMenuActivity extends CollectAbstractActivity implements AdminPa
         });
     }
 
-    private void importSettingsFromLegacyFiles() {
-        try {
-            String settings = new LegacySettingsFileReader(storagePathProvider).toJSON();
-
-            if (settings != null) {
-                if (settingsImporter.fromJSON(settings)) {
-                    ToastUtils.showLongToast(R.string.settings_successfully_loaded_file_notification);
-                    recreate();
-                } else {
-                    ToastUtils.showLongToast(R.string.corrupt_settings_file_notification);
-                }
+    private void tryToPerformAutomaticMigration() {
+        if (storageStateProvider.shouldPerformAutomaticMigration()) {
+            StorageMigrationDialog dialog = showStorageMigrationDialog();
+            if (dialog != null) {
+                dialog.startStorageMigration();
             }
-        } catch (LegacySettingsFileReader.CorruptSettingsFileException e) {
-            ToastUtils.showLongToast(R.string.corrupt_settings_file_notification);
         }
     }
 }

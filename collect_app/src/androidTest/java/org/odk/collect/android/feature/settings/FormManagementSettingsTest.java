@@ -17,7 +17,6 @@ import org.odk.collect.android.support.NotificationDrawerRule;
 import org.odk.collect.android.support.TestDependencies;
 import org.odk.collect.android.support.TestRuleChain;
 import org.odk.collect.android.support.TestScheduler;
-import org.odk.collect.android.support.pages.AdminSettingsPage;
 import org.odk.collect.android.support.pages.FormManagementPage;
 import org.odk.collect.android.support.pages.GeneralSettingsPage;
 import org.odk.collect.android.support.pages.MainMenuPage;
@@ -104,7 +103,7 @@ public class FormManagementSettingsTest {
                 .clickOnString(R.string.automatic_download);
 
         FormLoadingUtils.copyFormToStorage("one-question.xml");
-        testDependencies.server.addForm("One Question Updated", "one_question", "one-question-updated.xml");
+        testDependencies.server.addForm("One Question Updated", "one_question", "2", "one-question-updated.xml");
         testDependencies.scheduler.runDeferredTasks();
 
         page.pressBack(new GeneralSettingsPage(rule))
@@ -118,38 +117,19 @@ public class FormManagementSettingsTest {
 
     @Test
     public void whenGoogleDriveUsingAsServer_disablesPrefsAndOnlyAllowsManualUpdates() {
+        testDependencies.googleAccountPicker.setDeviceAccount("steph@curry.basket");
+
         new MainMenuPage(rule).assertOnPage()
                 .enablePreviouslyDownloadedOnlyUpdates() // Enabled a different mode before setting up Google
-                .setGoogleDriveAccount("steph@curry.basket")
+                .setGoogleAccount("steph@curry.basket")
                 .clickOnMenu()
                 .clickGeneralSettings()
                 .clickFormManagement()
                 .assertDisabled(R.string.form_update_mode_title)
                 .assertDisabled(R.string.form_update_frequency_title)
                 .assertDisabled(R.string.automatic_download)
-                .assertText(R.string.manually);
+                .assertText(R.string.manual);
 
         assertThat(testDependencies.scheduler.getDeferredTasks().size(), is(0));
-    }
-
-    @Test
-    public void whenFormUpdatesPrefsDisabledInAdminSettings_disablesPrefs() {
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickAdminSettings()
-                .openUserSettings()
-                .uncheckUserSettings(R.string.form_update_mode_title)
-                .uncheckUserSettings(R.string.periodic_form_updates_check_title)
-                .uncheckUserSettings(R.string.automatic_download)
-                .uncheckUserSettings(R.string.hide_old_form_versions_setting_title)
-                .pressBack(new AdminSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
-                .clickOnMenu()
-                .clickGeneralSettings()
-                .clickFormManagement()
-                .assertTextDoesNotExist(R.string.form_update_mode_title)
-                .assertTextDoesNotExist(R.string.periodic_form_updates_check_title)
-                .assertTextDoesNotExist(R.string.automatic_download)
-                .assertTextDoesNotExist(R.string.hide_old_form_versions_setting_title);
     }
 }

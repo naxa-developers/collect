@@ -16,8 +16,6 @@
 
 package org.odk.collect.android.forms;
 
-import org.odk.collect.android.storage.StoragePathProvider;
-
 import javax.annotation.Nullable;
 
 /**
@@ -42,7 +40,6 @@ public final class Form {
     private final String language;
     private final String autoSend;
     private final String autoDelete;
-    private final String lastDetectedFormVersionHash;
     private final String geometryXPath;
     private final boolean deleted;
 
@@ -62,7 +59,6 @@ public final class Form {
         language = builder.language;
         autoSend = builder.autoSend;
         autoDelete = builder.autoDelete;
-        lastDetectedFormVersionHash = builder.lastDetectedFormVersionHash;
         geometryXPath = builder.geometryXpath;
         deleted = builder.deleted;
     }
@@ -83,7 +79,6 @@ public final class Form {
         private String language;
         private String autoSend;
         private String autoDelete;
-        private String lastDetectedFormVersionHash;
         private String geometryXpath;
         private boolean deleted;
 
@@ -106,7 +101,6 @@ public final class Form {
             language = form.language;
             autoSend = form.autoSend;
             autoDelete = form.autoDelete;
-            lastDetectedFormVersionHash = form.lastDetectedFormVersionHash;
             geometryXpath = form.geometryXPath;
             this.deleted = form.deleted;
         }
@@ -186,11 +180,6 @@ public final class Form {
             return this;
         }
 
-        public Builder lastDetectedFormVersionHash(String lastDetectedFormVersionHash) {
-            this.lastDetectedFormVersionHash = lastDetectedFormVersionHash;
-            return this;
-        }
-
         public Builder geometryXpath(String geometryXpath) {
             this.geometryXpath = geometryXpath;
             return this;
@@ -231,10 +220,6 @@ public final class Form {
         return formFilePath;
     }
 
-    public String getAbsoluteFormFilePath() {
-        return new StoragePathProvider().getAbsoluteFormFilePath(formFilePath);
-    }
-
     public String getSubmissionUri() {
         return submissionUri;
     }
@@ -273,10 +258,6 @@ public final class Form {
 
     public String getGeometryXpath() {
         return geometryXPath;
-    }
-
-    public String getLastDetectedFormVersionHash() {
-        return lastDetectedFormVersionHash;
     }
 
     public boolean isDeleted() {

@@ -29,6 +29,8 @@ public abstract class WidgetTest {
     @Mock
     public IFormElement formElement;
 
+    public boolean readOnlyOverride;
+
     @Before
     @OverridingMethodsMustInvokeSuper
     public void setUp() throws Exception {
@@ -45,6 +47,9 @@ public abstract class WidgetTest {
 
     @Test
     public abstract void callingClearShouldRemoveTheExistingAnswer();
+
+    @Test
+    public abstract void callingClearShouldCallValueChangeListeners();
 
     @Test
     public abstract void usingReadOnlyOptionShouldMakeAllClickableElementsDisabled();

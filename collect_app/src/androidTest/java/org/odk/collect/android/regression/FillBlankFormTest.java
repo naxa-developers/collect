@@ -13,7 +13,9 @@ import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
 import org.odk.collect.android.R;
 import org.odk.collect.android.activities.FormEntryActivity;
-import org.odk.collect.android.provider.InstanceProviderAPI;
+import org.odk.collect.android.instances.Instance;
+import org.odk.collect.android.storage.StoragePathProvider;
+import org.odk.collect.android.storage.StorageSubdirectory;
 import org.odk.collect.android.support.ActivityHelpers;
 import org.odk.collect.android.support.CollectTestRule;
 import org.odk.collect.android.support.CopyFormRule;
@@ -462,14 +464,17 @@ public class FillBlankFormTest {
         new MainMenuPage(rule)
                 .startBlankForm("Nigeria Wards")
                 .assertQuestion("State")
-                .clickOnString(R.string.select_one)
+                .openSelectMinimalDialog()
                 .clickOnText("Adamawa")
+                .closeSelectMinimalDialog()
                 .swipeToNextQuestion("LGA", true)
-                .clickOnString(R.string.select_one)
+                .openSelectMinimalDialog()
                 .clickOnText("Ganye")
+                .closeSelectMinimalDialog()
                 .swipeToNextQuestion("Ward", true)
-                .clickOnString(R.string.select_one)
+                .openSelectMinimalDialog()
                 .clickOnText("Jaggu")
+                .closeSelectMinimalDialog()
                 .swipeToNextQuestion("Comments")
                 .swipeToEndScreen()
                 .clickSaveAndExit();
@@ -550,7 +555,7 @@ public class FillBlankFormTest {
                 .clickSaveAndExit()
                 .checkIsToastWithMessageDisplayed("This form does not specify an instanceID. You must specify one to enable encryption. Form has not been saved as finalized.")
                 .clickEditSavedForm()
-                .checkInstanceState("Birds", InstanceProviderAPI.STATUS_INCOMPLETE);
+                .checkInstanceState("Birds", Instance.STATUS_INCOMPLETE);
     }
 
     @Test
@@ -652,20 +657,22 @@ public class FillBlankFormTest {
 
     @Test
     public void missingFileMessage_shouldBeDisplayedIfExternalFIleIsMissing() {
+        String formsDirPath = new StoragePathProvider().getDirPath(StorageSubdirectory.FORMS);
+
         //TestCase55
         new MainMenuPage(rule)
                 .startBlankForm("search_and_select")
-                .assertText("File: /storage/emulated/0/odk/forms/search_and_select-media/nombre.csv is missing.")
-                .assertText("File: /storage/emulated/0/odk/forms/search_and_select-media/nombre2.csv is missing.")
+                .assertText("File: " + formsDirPath + "/search_and_select-media/nombre.csv is missing.")
+                .assertText("File: " + formsDirPath + "/search_and_select-media/nombre2.csv is missing.")
                 .swipeToEndScreen()
                 .clickSaveAndExit()
 
                 .startBlankForm("cascading select test")
                 .clickOnText("Texas")
                 .swipeToNextQuestion()
-                .assertText("File: /storage/emulated/0/odk/forms/select_one_external-media/itemsets.csv is missing.")
+                .assertText("File: " + formsDirPath + "/select_one_external-media/itemsets.csv is missing.")
                 .swipeToNextQuestion()
-                .assertText("File: /storage/emulated/0/odk/forms/select_one_external-media/itemsets.csv is missing.")
+                .assertText("File: " + formsDirPath + "/select_one_external-media/itemsets.csv is missing.")
                 .swipeToNextQuestion(3)
                 .swipeToEndScreen()
                 .clickSaveAndExit()
@@ -675,7 +682,7 @@ public class FillBlankFormTest {
                 .clickGoUpIcon()
                 .clickOnElementInHierarchy(14)
                 .clickOnQuestion("Source15")
-                .assertText("File: /storage/emulated/0/odk/forms/fieldlist-updates_nocsv-media/fruits.csv is missing.")
+                .assertText("File: " + formsDirPath + "/fieldlist-updates_nocsv-media/fruits.csv is missing.")
                 .swipeToEndScreen()
                 .clickSaveAndExit();
     }
@@ -694,29 +701,6 @@ public class FillBlankFormTest {
                 .assertText("submission")
                 .rotateToPortrait(new FormEntryPage("All widgets", rule))
                 .assertText("submission");
-    }
-
-    @Test
-    public void backwardButton_shouldNotBeClickableOnTheFirstFormPage() {
-        //TestCase14
-        new MainMenuPage(rule)
-                .startBlankForm("All widgets")
-                .checkAreNavigationButtonsNotDisplayed()
-                .clickOptionsIcon()
-                .clickGeneralSettings()
-                .clickOnUserInterface()
-                .clickNavigation()
-                .clickUseNavigationButtons()
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new FormEntryPage("All widgets", rule))
-                .checkBackNavigationButtonIsNotsDisplayed()
-                .checkNextNavigationButtonIsDisplayed()
-                .rotateToLandscape(new FormEntryPage("All widgets", rule))
-                .checkBackNavigationButtonIsNotsDisplayed()
-                .checkNextNavigationButtonIsDisplayed()
-                .rotateToPortrait(new FormEntryPage("All widgets", rule))
-                .checkBackNavigationButtonIsNotsDisplayed()
-                .checkNextNavigationButtonIsDisplayed();
     }
 
     @Test

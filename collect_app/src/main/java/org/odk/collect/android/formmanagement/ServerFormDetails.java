@@ -14,43 +14,36 @@
 
 package org.odk.collect.android.formmanagement;
 
+import org.odk.collect.android.forms.ManifestFile;
+
 import java.io.Serializable;
 
 public class ServerFormDetails implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private String errorStr;
-    private String formName;
-    private String downloadUrl;
-    private String manifestUrl;
-    private String formID;
-    private String formVersion;
-    private String hash;
-    private String manifestFileHash;
-    private boolean isNotOnDevice;
-    private boolean isUpdated;
-
-    public ServerFormDetails(String error) {
-        errorStr = error;
-    }
+    private final String formName;
+    private final String downloadUrl;
+    private final String manifestUrl;
+    private final String formID;
+    private final String formVersion;
+    private final String hash;
+    private final boolean isNotOnDevice;
+    private final boolean isUpdated;
+    private final ManifestFile manifest;
 
     public ServerFormDetails(String formName, String downloadUrl, String manifestUrl, String formID,
-                             String formVersion, String hash, String manifestFileHash,
-                             boolean isNotOnDevice, boolean isUpdated) {
+                             String formVersion, String hash,
+                             boolean isNotOnDevice, boolean isUpdated, ManifestFile manifest) {
         this.formName = formName;
         this.downloadUrl = downloadUrl;
         this.manifestUrl = manifestUrl;
         this.formID = formID;
         this.formVersion = formVersion;
         this.hash = hash;
-        this.manifestFileHash = manifestFileHash;
         this.isNotOnDevice = isNotOnDevice;
         this.isUpdated = isUpdated;
-    }
-
-    public String getErrorStr() {
-        return errorStr;
+        this.manifest = manifest;
     }
 
     public String getFormName() {
@@ -77,15 +70,15 @@ public class ServerFormDetails implements Serializable {
         return hash;
     }
 
-    public String getManifestFileHash() {
-        return manifestFileHash;
-    }
-
     public boolean isNotOnDevice() {
         return isNotOnDevice;
     }
 
     public boolean isUpdated() {
         return isUpdated;
+    }
+
+    public ManifestFile getManifest() {
+        return manifest;
     }
 }

@@ -4,7 +4,6 @@ import android.net.Uri;
 
 import org.odk.collect.android.forms.Form;
 import org.odk.collect.android.forms.FormsRepository;
-import org.odk.collect.android.utilities.MultiFormDownloader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,25 +11,11 @@ import java.util.Objects;
 
 import javax.annotation.Nullable;
 
+import static java.util.stream.Collectors.toList;
+
 public class InMemFormsRepository implements FormsRepository {
 
     private final List<Form> forms = new ArrayList<>();
-
-    @Override
-    public Uri save(Form form) {
-        forms.add(form);
-        return null;
-    }
-
-    @Override
-    public boolean contains(String jrFormId) {
-        return forms.stream().anyMatch(f -> f.getJrFormId().equals(jrFormId));
-    }
-
-    @Override
-    public List<Form> getAll() {
-        return new ArrayList<>(forms); // Avoid anything  mutating the list externally
-    }
 
     @Nullable
     @Override
@@ -40,37 +25,45 @@ public class InMemFormsRepository implements FormsRepository {
 
     @Nullable
     @Override
-    public Form get(String jrFormId, @Nullable String jrVersion) {
-        return forms.stream().filter(f -> {
-            return f.getJrFormId().equals(jrFormId) && Objects.equals(f.getJrVersion(), jrVersion);
-        }).findFirst().orElse(null);
+    public Form getOneByFormIdAndVersion(String formId, @Nullable String version) {
+        return forms.stream().filter(f -> f.getJrFormId().equals(formId) && Objects.equals(f.getJrVersion(), version)).findFirst().orElse(null);
     }
 
     @Nullable
     @Override
-    public Form getByMd5Hash(String hash) {
+    public Form getOneByMd5Hash(String hash) {
         return forms.stream().filter(f -> f.getMD5Hash().equals(hash)).findFirst().orElse(null);
     }
 
     @Nullable
     @Override
-    public Form getByLastDetectedUpdate(String formHash, String manifestHash) {
-        String lastDetectedVersion = MultiFormDownloader.getMd5Hash(formHash) + manifestHash;
-
-        return forms.stream().filter(f -> {
-            String formLastDetectedVersion = f.getLastDetectedFormVersionHash();
-            if (formLastDetectedVersion != null) {
-                return formLastDetectedVersion.equals(lastDetectedVersion);
-            } else {
-                return false;
-            }
-        }).findFirst().orElse(null);
+    public Form getOneByPath(String path) {
+        return forms.stream().filter(f -> f.getFormFilePath().equals(path)).findFirst().orElse(null);
     }
 
-    @Nullable
     @Override
-    public Form getByPath(String path) {
-        throw new UnsupportedOperationException();
+    public List<Form> getAll() {
+        return new ArrayList<>(forms); // Avoid anything  mutating the list externally
+    }
+
+    @Override
+    public List<Form> getAllByFormIdAndVersion(String jrFormId, @Nullable String jrVersion) {
+        return forms.stream().filter(f -> f.getJrFormId().equals(jrFormId) && Objects.equals(f.getJrVersion(), jrVersion)).collect(toList());
+    }
+
+    @Override
+    public List<Form> getAllNotDeletedByFormId(String jrFormId) {
+        return forms.stream().filter(f -> f.getJrFormId().equals(jrFormId) && !f.isDeleted()).collect(toList());
+    }
+
+    public List<Form> getAllNotDeletedByFormIdAndVersion(String jrFormId, @Nullable String jrVersion) {
+        return forms.stream().filter(f -> f.getJrFormId().equals(jrFormId) && Objects.equals(f.getJrVersion(), jrVersion) && !f.isDeleted()).collect(toList());
+    }
+
+    @Override
+    public Uri save(Form form) {
+        forms.add(form);
+        return null;
     }
 
     @Override
@@ -91,20 +84,19 @@ public class InMemFormsRepository implements FormsRepository {
     }
 
     @Override
-    public void setLastDetectedUpdated(String jrFormId, String formHash, String manifestHash) {
-        Form form = forms.stream().filter(f -> f.getJrFormId().equals(jrFormId)).findFirst().orElse(null);
+    public void deleteByMd5Hash(String md5Hash) {
+        forms.removeIf(f -> f.getMD5Hash().equals(md5Hash));
+    }
+
+    @Override
+    public void restore(Long id) {
+        Form form = forms.stream().filter(f -> f.getId().equals(id)).findFirst().orElse(null);
 
         if (form != null) {
             forms.remove(form);
             forms.add(new Form.Builder(form)
-                    .lastDetectedFormVersionHash(MultiFormDownloader.getMd5Hash(formHash) + manifestHash)
+                    .deleted(false)
                     .build());
         }
-
-    }
-
-    @Override
-    public void deleteFormsByMd5Hash(String md5Hash) {
-        throw new UnsupportedOperationException();
     }
 }

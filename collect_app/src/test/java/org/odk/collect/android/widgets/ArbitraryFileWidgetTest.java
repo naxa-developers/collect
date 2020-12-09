@@ -1,6 +1,5 @@
 package org.odk.collect.android.widgets;
 
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.view.View;
@@ -16,15 +15,15 @@ import org.mockito.Mock;
 import org.odk.collect.android.R;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.utilities.FileUtil;
-import org.odk.collect.android.utilities.MediaUtil;
+import org.odk.collect.android.utilities.MediaUtils;
 import org.odk.collect.android.widgets.base.FileWidgetTest;
+import org.odk.collect.android.widgets.support.FakeQuestionMediaManager;
 import org.odk.collect.android.widgets.support.FakeWaitingForDataRegistry;
 
 import java.io.File;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,7 +32,7 @@ public class ArbitraryFileWidgetTest extends FileWidgetTest<ArbitraryFileWidget>
     Uri uri;
 
     @Mock
-    MediaUtil mediaUtil;
+    MediaUtils mediaUtils;
 
     @Mock
     FileUtil fileUtil;
@@ -54,7 +53,8 @@ public class ArbitraryFileWidgetTest extends FileWidgetTest<ArbitraryFileWidget>
     @NonNull
     @Override
     public ArbitraryFileWidget createWidget() {
-        return new ArbitraryFileWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID"), fileUtil, mediaUtil, new FakeWaitingForDataRegistry());
+        return new ArbitraryFileWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID", readOnlyOverride),
+                fileUtil, mediaUtils, new FakeQuestionMediaManager(), new FakeWaitingForDataRegistry());
     }
 
     @NonNull
@@ -96,13 +96,19 @@ public class ArbitraryFileWidgetTest extends FileWidgetTest<ArbitraryFileWidget>
         assertThat(getSpyWidget().chooseFileButton.getVisibility(), is(View.GONE));
     }
 
+    @Test
+    public void whenReadOnlyOverrideOptionIsUsed_shouldAllClickableElementsBeDisabled() {
+        when(formEntryPrompt.isReadOnly()).thenReturn(true);
+
+        assertThat(getSpyWidget().chooseFileButton.getVisibility(), is(View.GONE));
+    }
+
     public void prepareForSetAnswer() {
         when(formEntryPrompt.isReadOnly()).thenReturn(false);
 
-        when(mediaUtil.getPathFromUri(any(Context.class), any(Uri.class), any(String.class)))
-                .thenReturn(String.format("%s.pdf", RandomString.make()));
-
-        when(fileUtil.getRandomFilename()).thenReturn(destinationName);
+        String sourcePath = String.format("%s.pdf", RandomString.make());
+        when(mediaUtils.getPath(activity, uri)).thenReturn(sourcePath);
+        when(mediaUtils.getDestinationPathFromSourcePath(sourcePath, "")).thenReturn(File.separator + destinationName + ".pdf");
 
         File firstFile = mock(File.class);
 

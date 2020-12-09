@@ -21,19 +21,25 @@ import android.content.Context;
 import androidx.work.WorkerParameters;
 
 import org.jetbrains.annotations.NotNull;
+import org.odk.collect.android.R;
+import org.odk.collect.android.formmanagement.FormDownloadException;
+import org.odk.collect.android.formmanagement.FormDownloadExceptionMapper;
+import org.odk.collect.android.formmanagement.FormDownloader;
 import org.odk.collect.android.formmanagement.ServerFormDetails;
-import org.odk.collect.android.formmanagement.previouslydownloaded.ServerFormsUpdateChecker;
+import org.odk.collect.android.formmanagement.ServerFormsDetailsFetcher;
 import org.odk.collect.android.injection.DaggerUtils;
 import org.odk.collect.android.notifications.Notifier;
 import org.odk.collect.android.preferences.PreferencesProvider;
 import org.odk.collect.android.storage.migration.StorageMigrationRepository;
-import org.odk.collect.android.utilities.MultiFormDownloader;
+import org.odk.collect.android.utilities.TranslationHandler;
 import org.odk.collect.async.TaskSpec;
 import org.odk.collect.async.WorkerAdapter;
+import org.odk.collect.android.forms.FormSourceException;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -43,13 +49,13 @@ import static org.odk.collect.android.preferences.GeneralKeys.KEY_AUTOMATIC_UPDA
 public class AutoUpdateTaskSpec implements TaskSpec {
 
     @Inject
-    ServerFormsUpdateChecker serverFormsUpdateChecker;
+    ServerFormsDetailsFetcher serverFormsDetailsFetcher;
 
     @Inject
     StorageMigrationRepository storageMigrationRepository;
 
     @Inject
-    MultiFormDownloader multiFormDownloader;
+    FormDownloader formDownloader;
 
     @Inject
     Notifier notifier;
@@ -67,24 +73,40 @@ public class AutoUpdateTaskSpec implements TaskSpec {
         DaggerUtils.getComponent(context).inject(this);
 
         return () -> {
-            List<ServerFormDetails> newUpdates = serverFormsUpdateChecker.check();
+            try {
+                List<ServerFormDetails> serverForms = serverFormsDetailsFetcher.fetchFormDetails();
+                List<ServerFormDetails> updatedForms = serverForms.stream().filter(ServerFormDetails::isUpdated).collect(Collectors.toList());
 
-            if (!newUpdates.isEmpty()) {
-                if (preferencesProvider.getGeneralSharedPreferences().getBoolean(KEY_AUTOMATIC_UPDATE, false)) {
-                    changeLock.withLock(acquiredLock -> {
-                        if (acquiredLock) {
-                            final HashMap<ServerFormDetails, String> result = multiFormDownloader.downloadForms(newUpdates, null);
-                            notifier.onUpdatesDownloaded(result);
-                        }
+                if (!updatedForms.isEmpty()) {
+                    if (preferencesProvider.getGeneralSharedPreferences().getBoolean(KEY_AUTOMATIC_UPDATE, false)) {
+                        changeLock.withLock(acquiredLock -> {
+                            if (acquiredLock) {
+                                HashMap<ServerFormDetails, String> results = new HashMap<>();
+                                for (ServerFormDetails serverFormDetails : updatedForms) {
+                                    try {
+                                        formDownloader.downloadForm(serverFormDetails, null, null);
+                                        results.put(serverFormDetails, TranslationHandler.getString(context, R.string.success));
+                                    } catch (FormDownloadException e) {
+                                        results.put(serverFormDetails, new FormDownloadExceptionMapper(context).getMessage(e));
+                                    } catch (InterruptedException e) {
+                                        break;
+                                    }
+                                }
 
-                        return null;
-                    });
-                } else {
-                    notifier.onUpdatesAvailable();
+                                notifier.onUpdatesDownloaded(results);
+                            }
+
+                            return null;
+                        });
+                    } else {
+                        notifier.onUpdatesAvailable(updatedForms);
+                    }
                 }
-            }
 
-            return true;
+                return true;
+            } catch (FormSourceException e) {
+                return true;
+            }
         };
     }
 

@@ -27,30 +27,31 @@ public final class AdminKeys {
     public static final String KEY_DELETE_SAVED                 = "delete_saved";
     public static final String KEY_QR_CODE_SCANNER              = "qr_code_scanner";
 
-    private static final String KEY_CHANGE_SERVER               = "change_server";
+    public static final String KEY_CHANGE_SERVER               = "change_server";
 
-    private static final String KEY_APP_THEME                   = "change_app_theme";
-    private static final String KEY_APP_LANGUAGE                = "change_app_language";
-    private static final String KEY_CHANGE_FONT_SIZE            = "change_font_size";
-    private static final String KEY_NAVIGATION                  = "change_navigation";
-    private static final String KEY_SHOW_SPLASH_SCREEN          = "show_splash_screen";
+    public static final String KEY_APP_THEME                   = "change_app_theme";
+    public static final String KEY_APP_LANGUAGE                = "change_app_language";
+    public static final String KEY_CHANGE_FONT_SIZE            = "change_font_size";
+    public static final String KEY_NAVIGATION                  = "change_navigation";
+    public static final String KEY_SHOW_SPLASH_SCREEN          = "show_splash_screen";
+    public static final String KEY_EXTERNAL_APP_RECORDING      = "external_app_recording";
 
     static final String KEY_MAPS                                = "maps";
 
     private static final String KEY_FORM_UPDATE_MODE            = "form_update_mode";
-    private static final String KEY_PERIODIC_FORM_UPDATES_CHECK = "periodic_form_updates_check";
-    private static final String KEY_AUTOMATIC_UPDATE            = "automatic_update";
-    private static final String KEY_HIDE_OLD_FORM_VERSIONS      = "hide_old_form_versions";
-    private static final String KEY_AUTOSEND                    = "change_autosend";
-    private static final String KEY_DELETE_AFTER_SEND           = "delete_after_send";
-    private static final String KEY_DEFAULT_TO_FINALIZED        = "default_to_finalized";
-    private static final String KEY_CONSTRAINT_BEHAVIOR         = "change_constraint_behavior";
-    private static final String KEY_HIGH_RESOLUTION             = "high_resolution";
-    private static final String KEY_IMAGE_SIZE                  = "image_size";
-    private static final String KEY_GUIDANCE_HINT               = "guidance_hint";
-    private static final String KEY_INSTANCE_FORM_SYNC          = "instance_form_sync";
-    private static final String KEY_CHANGE_FORM_METADATA        = "change_form_metadata";
-    private static final String KEY_ANALYTICS                   = "analytics";
+    public static final String KEY_PERIODIC_FORM_UPDATES_CHECK = "periodic_form_updates_check";
+    public static final String KEY_AUTOMATIC_UPDATE            = "automatic_update";
+    public static final String KEY_HIDE_OLD_FORM_VERSIONS      = "hide_old_form_versions";
+    public static final String KEY_AUTOSEND                    = "change_autosend";
+    public static final String KEY_DELETE_AFTER_SEND           = "delete_after_send";
+    public static final String KEY_DEFAULT_TO_FINALIZED        = "default_to_finalized";
+    public static final String KEY_CONSTRAINT_BEHAVIOR         = "change_constraint_behavior";
+    public static final String KEY_HIGH_RESOLUTION             = "high_resolution";
+    public static final String KEY_IMAGE_SIZE                  = "image_size";
+    public static final String KEY_GUIDANCE_HINT               = "guidance_hint";
+    public static final String KEY_INSTANCE_FORM_SYNC          = "instance_form_sync";
+    public static final String KEY_CHANGE_FORM_METADATA        = "change_form_metadata";
+    public static final String KEY_ANALYTICS                   = "analytics";
 
     public static final String KEY_MOVING_BACKWARDS             = "moving_backwards";
     public static final String KEY_ACCESS_SETTINGS              = "access_settings";
@@ -94,7 +95,8 @@ public final class AdminKeys {
             ag(KEY_CONSTRAINT_BEHAVIOR,        GeneralKeys.KEY_CONSTRAINT_BEHAVIOR),
 
             ag(KEY_ANALYTICS,                  GeneralKeys.KEY_ANALYTICS),
-            ag(KEY_FORM_UPDATE_MODE,           GeneralKeys.KEY_FORM_UPDATE_MODE)
+            ag(KEY_FORM_UPDATE_MODE,           GeneralKeys.KEY_FORM_UPDATE_MODE),
+            ag(KEY_EXTERNAL_APP_RECORDING,     GeneralKeys.KEY_EXTERNAL_APP_RECORDING)
     };
 
     /** Admin keys other than those in adminToGeneral above */
@@ -138,7 +140,8 @@ public final class AdminKeys {
             KEY_HIGH_RESOLUTION,
             KEY_IMAGE_SIZE,
             KEY_GUIDANCE_HINT,
-            KEY_INSTANCE_FORM_SYNC
+            KEY_INSTANCE_FORM_SYNC,
+            KEY_EXTERNAL_APP_RECORDING
     );
 
     static Collection<String> userInterfaceKeys = Arrays.asList(

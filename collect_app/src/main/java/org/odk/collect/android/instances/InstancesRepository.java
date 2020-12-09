@@ -1,6 +1,10 @@
 package org.odk.collect.android.instances;
 
+import android.net.Uri;
+
 import java.util.List;
+
+import javax.annotation.Nullable;
 
 /**
  * Gives access to {@link Instance} objects representing filled form instances on the device.
@@ -12,17 +16,22 @@ import java.util.List;
  * without introducing new specialized methods (e.g. get(Specification s) instead of getBy(XYZ).
  */
 public interface InstancesRepository {
-
-    Instance get(long databaseId);
-
-    List<Instance> getAllByJrFormId(String formId);
-
-    List<Instance> getAllByJrFormIdAndJrVersion(String jrFormId, String jrVersion);
+    @Nullable
+    Instance get(Long id);
 
     /**
-     * Get the Instance corresponding to the given path or null if no unique Instance matches.
+     * Null if not exactly one instance matches.
      */
-    Instance getByPath(String instancePath);
+    @Nullable
+    Instance getOneByPath(String instancePath);
+
+    List<Instance> getAllFinalized();
+
+    List<Instance> getAllByFormId(String formId);
+
+    List<Instance> getAllNotDeletedByFormIdAndVersion(String formId, String version);
 
     void delete(Long id);
+
+    Uri save(Instance instance);
 }

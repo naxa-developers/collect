@@ -17,14 +17,13 @@ package org.odk.collect.android.formentry.questions;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.text.method.LinkMovementMethod;
 import android.util.AttributeSet;
-import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.View;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -33,18 +32,18 @@ import android.widget.RadioButton;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 
+import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
 
-import org.javarosa.core.reference.InvalidReferenceException;
-import org.javarosa.core.reference.ReferenceManager;
 import org.jetbrains.annotations.NotNull;
 import org.odk.collect.android.BuildConfig;
 import org.odk.collect.android.R;
 import org.odk.collect.android.audio.AudioButton;
 import org.odk.collect.android.audio.AudioHelper;
-import org.odk.collect.android.audio.Clip;
+import org.odk.collect.android.listeners.SelectItemClickListener;
 import org.odk.collect.android.utilities.ContentUriProvider;
 import org.odk.collect.android.utilities.FileUtils;
 import org.odk.collect.android.utilities.FormEntryPromptUtils;
@@ -52,6 +51,7 @@ import org.odk.collect.android.utilities.ScreenContext;
 import org.odk.collect.android.utilities.StringUtils;
 import org.odk.collect.android.utilities.ThemeUtils;
 import org.odk.collect.android.utilities.ToastUtils;
+import org.odk.collect.audioclips.Clip;
 
 import java.io.File;
 
@@ -86,12 +86,12 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
     @BindView(R.id.media_buttons)
     LinearLayout mediaButtonsContainer;
 
-    private String videoURI;
     private int originalTextColor;
     private int playTextColor = Color.BLUE;
     private CharSequence questionText;
-    private String bigImageURI;
-    private ReferenceManager referenceManager;
+    private SelectItemClickListener listener;
+    private File videoFile;
+    private File bigImageFile;
 
     public AudioVideoImageTextLabel(Context context) {
         super(context);
@@ -110,11 +110,16 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
     public void setTextView(TextView questionText) {
         this.questionText = questionText.getText();
 
-        this.labelTextView = questionText;
-        this.labelTextView.setId(View.generateViewId());
+        labelTextView = questionText;
+        labelTextView.setId(R.id.text_label);
+        labelTextView.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onItemClicked();
+            }
+        });
 
         textContainer.removeAllViews();
-        textContainer.addView(this.labelTextView);
+        textContainer.addView(labelTextView);
     }
 
     public void setText(String questionText, boolean isRequiredQuestion, float fontSize) {
@@ -136,23 +141,30 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
         setupAudioButton(audioURI, audioHelper);
     }
 
-    /**
-     * This should move to separate setters like {@link #setAudio(String, AudioHelper)}
-     */
-    @Deprecated
-    public void setImageVideo(String imageURI, String videoURI,
-                              String bigImageURI, ReferenceManager referenceManager) {
-        this.bigImageURI = bigImageURI;
-        this.videoURI = videoURI;
-        this.referenceManager = referenceManager;
+    public void setImage(@NonNull File imageFile) {
+        if (imageFile.exists()) {
+            imageView.layout(0, 0, 0, 0);
 
-        if (videoURI != null) {
-            setupVideoButton();
-        }
+            Glide.with(this)
+                    .load(imageFile)
+                    .centerInside()
+                    .into(imageView);
 
-        if (imageURI != null) {
-            setupBigImage(imageURI);
+            imageView.setVisibility(VISIBLE);
+            imageView.setOnClickListener(this);
+        } else {
+            missingImage.setVisibility(VISIBLE);
+            missingImage.setText(getContext().getString(R.string.file_missing, imageFile));
         }
+    }
+
+    public void setBigImage(@NonNull File bigImageFile) {
+        this.bigImageFile = bigImageFile;
+    }
+
+    public void setVideo(@NonNull File videoFile) {
+        this.videoFile = videoFile;
+        setupVideoButton();
     }
 
     public void setPlayTextColor(int textColor) {
@@ -161,18 +173,10 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
     }
 
     public void playVideo() {
-        String videoFilename = "";
-        try {
-            videoFilename = referenceManager.deriveReference(videoURI).getLocalURI();
-        } catch (InvalidReferenceException e) {
-            Timber.e(e, "Invalid reference exception due to %s ", e.getMessage());
-        }
-
-        File videoFile = new File(videoFilename);
         if (!videoFile.exists()) {
             // We should have a video clip, but the file doesn't exist.
-            String errorMsg = getContext().getString(R.string.file_missing, videoFilename);
-            Timber.d("File %s is missing", videoFilename);
+            String errorMsg = getContext().getString(R.string.file_missing, videoFile);
+            Timber.d("File %s is missing", videoFile);
             ToastUtils.showLongToast(errorMsg);
             return;
         }
@@ -191,6 +195,22 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
 
     public TextView getLabelTextView() {
         return labelTextView;
+    }
+
+    public ImageView getImageView() {
+        return imageView;
+    }
+
+    public TextView getMissingImage() {
+        return missingImage;
+    }
+
+    public Button getVideoButton() {
+        return videoButton;
+    }
+
+    public Button getAudioButton() {
+        return audioButton;
     }
 
     @Override
@@ -217,7 +237,7 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
     }
 
     private void onImageClick() {
-        if (bigImageURI != null) {
+        if (bigImageFile != null) {
             openImage();
         } else {
             selectItem();
@@ -226,15 +246,12 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
 
     private void openImage() {
         try {
-            File bigImage = new File(referenceManager.deriveReference(bigImageURI).getLocalURI());
             Intent intent = new Intent("android.intent.action.VIEW");
             Uri uri =
-                    ContentUriProvider.getUriForFile(getContext(), BuildConfig.APPLICATION_ID + ".provider", bigImage);
+                    ContentUriProvider.getUriForFile(getContext(), BuildConfig.APPLICATION_ID + ".provider", bigImageFile);
             FileUtils.grantFileReadPermissions(intent, uri, getContext());
             intent.setDataAndType(uri, "image/*");
             getContext().startActivity(intent);
-        } catch (InvalidReferenceException e) {
-            Timber.e(e, "Invalid image reference due to %s ", e.getMessage());
         } catch (ActivityNotFoundException e) {
             Timber.d(e, "No Activity found to handle due to %s", e.getMessage());
             ToastUtils.showShortToast(getContext().getString(R.string.activity_not_found,
@@ -249,41 +266,8 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
             CheckBox checkbox = (CheckBox) labelTextView;
             checkbox.setChecked(!checkbox.isChecked());
         }
-    }
-
-    private void setupBigImage(String imageURI) {
-        String errorMsg = null;
-
-        try {
-            String imageFilename = this.referenceManager.deriveReference(imageURI).getLocalURI();
-            final File imageFile = new File(imageFilename);
-            if (imageFile.exists()) {
-                DisplayMetrics metrics = getResources().getDisplayMetrics();
-                int screenWidth = metrics.widthPixels;
-                int screenHeight = metrics.heightPixels;
-                Bitmap b = FileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
-                if (b != null) {
-                    imageView.setVisibility(VISIBLE);
-                    imageView.setImageBitmap(b);
-                    imageView.setOnClickListener(this);
-                } else {
-                    // Loading the image failed, so it's likely a bad file.
-                    errorMsg = getContext().getString(R.string.file_invalid, imageFile);
-                }
-            } else {
-                // We should have an image, but the file doesn't exist.
-                errorMsg = getContext().getString(R.string.file_missing, imageFile);
-            }
-
-            if (errorMsg != null) {
-                // errorMsg is only set when an error has occurred
-                Timber.e(errorMsg);
-                imageView.setVisibility(View.GONE);
-                missingImage.setVisibility(VISIBLE);
-                missingImage.setText(errorMsg);
-            }
-        } catch (InvalidReferenceException e) {
-            Timber.e(e, "Invalid image reference due to %s ", e.getMessage());
+        if (listener != null) {
+            listener.onItemClicked();
         }
     }
 
@@ -324,5 +308,9 @@ public class AudioVideoImageTextLabel extends RelativeLayout implements View.OnC
         } catch (ClassCastException e) {
             throw new RuntimeException(getContext().toString() + " must implement " + ScreenContext.class.getName());
         }
+    }
+
+    public void setItemClickListener(SelectItemClickListener listener) {
+        this.listener = listener;
     }
 }

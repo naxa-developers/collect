@@ -16,13 +16,18 @@
 
 package org.odk.collect.android.utilities;
 
+import android.content.Context;
+import android.content.res.Configuration;
 import android.util.DisplayMetrics;
 
 import org.odk.collect.android.application.Collect;
 
 public class ScreenUtils {
 
-    private ScreenUtils() {
+    private final Context context;
+
+    public ScreenUtils(Context context) {
+        this.context = context;
     }
 
     public static int getScreenWidth() {
@@ -33,7 +38,19 @@ public class ScreenUtils {
         return getDisplayMetrics().heightPixels;
     }
 
+    public static float xdpi() {
+        return getDisplayMetrics().xdpi;
+    }
+
+    public static float ydpi() {
+        return getDisplayMetrics().ydpi;
+    }
+
     private static DisplayMetrics getDisplayMetrics() {
         return Collect.getInstance().getResources().getDisplayMetrics();
+    }
+
+    public int getScreenSizeConfiguration() {
+        return context.getResources().getConfiguration().screenLayout & Configuration.SCREENLAYOUT_SIZE_MASK;
     }
 }

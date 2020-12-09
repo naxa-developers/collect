@@ -21,7 +21,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
-import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.AppCompatCheckBox;
@@ -34,51 +33,60 @@ import org.javarosa.form.api.FormEntryPrompt;
 import org.odk.collect.android.R;
 import org.odk.collect.android.audio.AudioHelper;
 import org.odk.collect.android.formentry.questions.AudioVideoImageTextLabel;
-import org.odk.collect.android.widgets.SelectWidget;
+import org.odk.collect.android.formentry.questions.NoButtonsItem;
+import org.odk.collect.android.listeners.SelectItemClickListener;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class SelectMultipleListAdapter extends AbstractSelectListAdapter {
 
+    private final List<Selection> originallySelectedItems;
     private final List<Selection> selectedItems;
-    private final int playColor;
+    protected SelectItemClickListener listener;
 
     @SuppressWarnings("PMD.ExcessiveParameterList")
-    public SelectMultipleListAdapter(List<SelectChoice> items, List<Selection> selectedItems, SelectWidget widget, int numColumns, FormEntryPrompt formEntryPrompt, ReferenceManager referenceManager, int answerFontSize, AudioHelper audioHelper, int playColor, Context context) {
-        super(items, widget, numColumns, formEntryPrompt, referenceManager, answerFontSize, audioHelper, context);
+    public SelectMultipleListAdapter(List<Selection> selectedItems, SelectItemClickListener listener,
+                                     Context context, List<SelectChoice> items,
+                                     FormEntryPrompt prompt, ReferenceManager referenceManager, AudioHelper audioHelper,
+                                     int playColor, int numColumns, boolean noButtonsMode) {
+        super(context, items, prompt, referenceManager, audioHelper, playColor, numColumns, noButtonsMode);
+        this.originallySelectedItems = new ArrayList<>(selectedItems);
         this.selectedItems = selectedItems;
-        this.playColor = playColor;
+        this.listener = listener;
     }
 
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         return new ViewHolder(noButtonsMode
-                ? new FrameLayout(parent.getContext())
-                : new AudioVideoImageTextLabel(parent.getContext()));
+                ? new NoButtonsItem(context, !prompt.isReadOnly())
+                : new AudioVideoImageTextLabel(context));
     }
 
     class ViewHolder extends AbstractSelectListAdapter.ViewHolder {
         ViewHolder(View v) {
             super(v);
             if (noButtonsMode) {
-                view = (FrameLayout) v;
+                noButtonsItem = (NoButtonsItem) v;
             } else {
                 audioVideoImageTextLabel = (AudioVideoImageTextLabel) v;
                 audioVideoImageTextLabel.setPlayTextColor(playColor);
-                adjustAudioVideoImageTextLabelParams();
+                audioVideoImageTextLabel.setItemClickListener(listener);
             }
         }
 
         void bind(final int index) {
             super.bind(index);
             if (noButtonsMode) {
-                view.setBackground(null);
+                noButtonsItem.setBackground(null);
                 for (Selection selectedItem : selectedItems) {
                     if (filteredItems.get(index).getValue().equals(selectedItem.getValue())) {
-                        view.setBackground(ContextCompat.getDrawable(view.getContext(), R.drawable.select_item_border));
+                        noButtonsItem.setBackground(ContextCompat.getDrawable(noButtonsItem.getContext(), R.drawable.select_item_border));
                         break;
                     }
                 }
+            } else {
+                adjustAudioVideoImageTextLabelForFlexAppearance();
             }
         }
     }
@@ -95,7 +103,9 @@ public class SelectMultipleListAdapter extends AbstractSelectListAdapter {
             } else {
                 removeItem(filteredItems.get(index).selection());
             }
-            widget.widgetValueChanged();
+            if (listener != null) {
+                listener.onItemClicked();
+            }
         });
 
         return checkBox;
@@ -118,11 +128,13 @@ public class SelectMultipleListAdapter extends AbstractSelectListAdapter {
             if (view != null) {
                 view.setBackground(null);
             }
+            audioHelper.stop();
         } else {
             addItem(selection);
             if (view != null) {
                 view.setBackground(ContextCompat.getDrawable(view.getContext(), R.drawable.select_item_border));
             }
+            playAudio(selection.choice);
         }
     }
 
@@ -141,13 +153,35 @@ public class SelectMultipleListAdapter extends AbstractSelectListAdapter {
         }
     }
 
+    @Override
     public void clearAnswer() {
         selectedItems.clear();
         notifyDataSetChanged();
-        widget.widgetValueChanged();
     }
 
+    @Override
     public List<Selection> getSelectedItems() {
         return selectedItems;
+    }
+
+    @Override
+    public boolean hasAnswerChanged() {
+        if (originallySelectedItems.size() != selectedItems.size()) {
+            return true;
+        }
+        for (Selection item : originallySelectedItems) {
+            boolean foundEqualElement = false;
+            for (Selection item2 : selectedItems) {
+                if (item.xmlValue.equals(item2.xmlValue)) {
+                    foundEqualElement = true;
+                    break;
+                }
+            }
+            if (!foundEqualElement) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
