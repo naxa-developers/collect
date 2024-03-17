@@ -23,10 +23,12 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import org.odk.collect.android.R;
 import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.logic.PropertyManager;
-import org.odk.collect.android.preferences.GeneralSharedPreferences;
+import org.odk.collect.android.preferences.dialogs.ServerAuthDialogFragment;
+import org.odk.collect.metadata.PropertyManager;
 
 import javax.inject.Inject;
 
@@ -45,15 +47,13 @@ public class AuthDialogUtility {
     WebCredentialsUtils webCredentialsUtils;
     @Inject
     PropertyManager propertyManager;
-    @Inject
-    GeneralSharedPreferences generalSharedPreferences;
 
     public AuthDialogUtility() {
         Collect.getInstance().getComponent().inject(this);
     }
 
     /**
-     * @deprecated should use {@link org.odk.collect.android.preferences.ServerAuthDialogFragment} instead
+     * @deprecated should use {@link ServerAuthDialogFragment} instead
      */
     @Deprecated
     public AlertDialog createDialog(final Context context,
@@ -79,12 +79,12 @@ public class AuthDialogUtility {
         username.setText(customUsername != null ? customUsername : overriddenUrl != null ? null : webCredentialsUtils.getUserNameFromPreferences());
         password.setText(customPassword != null ? customPassword : overriddenUrl != null ? null : webCredentialsUtils.getPasswordFromPreferences());
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
-        builder.setTitle(context.getString(R.string.server_requires_auth));
-        builder.setMessage(context.getString(R.string.server_auth_credentials, overriddenUrl != null ? overriddenUrl : webCredentialsUtils.getServerUrlFromPreferences()));
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
+        builder.setTitle(context.getString(org.odk.collect.strings.R.string.server_requires_auth));
+        builder.setMessage(context.getString(org.odk.collect.strings.R.string.server_auth_credentials, overriddenUrl != null ? overriddenUrl : webCredentialsUtils.getServerUrlFromPreferences()));
         builder.setView(dialogView);
         String finalOverriddenUrl = overriddenUrl;
-        builder.setPositiveButton(context.getString(R.string.ok), new DialogInterface.OnClickListener() {
+        builder.setPositiveButton(context.getString(org.odk.collect.strings.R.string.ok), new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 String userNameValue = username.getText().toString();
@@ -96,7 +96,7 @@ public class AuthDialogUtility {
                 if (customUsername != null && customPassword != null) {
                     webCredentialsUtils.saveCredentials(finalOverriddenUrl != null ? finalOverriddenUrl : webCredentialsUtils.getServerUrlFromPreferences(), userNameValue, passwordValue);
                 } else if (finalOverriddenUrl == null) {
-                    webCredentialsUtils.saveCredentialsPreferences(generalSharedPreferences, userNameValue, passwordValue, propertyManager);
+                    webCredentialsUtils.saveCredentialsPreferences(userNameValue, passwordValue, propertyManager);
                 } else {
                     webCredentialsUtils.saveCredentials(finalOverriddenUrl, userNameValue, passwordValue);
                 }
@@ -104,7 +104,7 @@ public class AuthDialogUtility {
                 resultListener.updatedCredentials();
             }
         });
-        builder.setNegativeButton(context.getString(R.string.cancel),
+        builder.setNegativeButton(context.getString(org.odk.collect.strings.R.string.cancel),
                 new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {

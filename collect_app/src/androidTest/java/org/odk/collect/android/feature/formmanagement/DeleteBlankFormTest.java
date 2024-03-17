@@ -6,10 +6,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.support.CollectTestRule;
 import org.odk.collect.android.support.TestDependencies;
-import org.odk.collect.android.support.TestRuleChain;
 import org.odk.collect.android.support.pages.MainMenuPage;
+import org.odk.collect.android.support.rules.CollectTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
 
 @RunWith(AndroidJUnit4.class)
 public class DeleteBlankFormTest {
@@ -23,71 +23,72 @@ public class DeleteBlankFormTest {
 
     @Test
     public void deletingAForm_removesFormFromBlankFormList() {
-        rule.mainMenu()
+        rule.startAtMainMenu()
                 .copyForm("one-question.xml")
                 .clickDeleteSavedForm()
                 .clickBlankForms()
                 .clickForm("One Question")
                 .clickDeleteSelected(1)
                 .clickDeleteForms()
-                .pressBack(new MainMenuPage(rule))
+                .assertTextDoesNotExist("One Question")
+                .pressBack(new MainMenuPage())
                 .clickFillBlankForm()
                 .assertNoForms();
     }
 
     @Test
     public void deletingAForm_whenThereFilledForms_removesFormFromBlankFormList_butAllowsEditingFilledForms() {
-        rule.mainMenu()
+        rule.startAtMainMenu()
                 .copyForm("one-question.xml")
                 .startBlankForm("One Question")
                 .answerQuestion("what is your age", "22")
                 .swipeToEndScreen()
-                .clickSaveAndExit()
+                .clickSaveAsDraft()
 
                 .clickDeleteSavedForm()
                 .clickBlankForms()
                 .clickForm("One Question")
                 .clickDeleteSelected(1)
                 .clickDeleteForms()
-                .pressBack(new MainMenuPage(rule))
+                .pressBack(new MainMenuPage())
                 .clickFillBlankForm()
                 .assertNoForms()
-                .pressBack(new MainMenuPage(rule))
+                .pressBack(new MainMenuPage())
 
-                .clickEditSavedForm()
+                .clickDrafts()
                 .clickOnForm("One Question")
                 .clickOnQuestion("what is your age")
                 .answerQuestion("what is your age", "30")
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
     @Test
     public void afterFillingAForm_andDeletingIt_allowsFormToBeReDownloaded() {
         testDependencies.server.addForm("One Question", "one_question", "1", "one-question.xml");
 
-        rule.mainMenu()
+        rule.startAtMainMenu()
                 .setServer(testDependencies.server.getURL())
                 .clickGetBlankForm()
                 .clickGetSelected()
-                .assertText("One Question (Version:: 1 ID: one_question) - Success")
-                .clickOK(new MainMenuPage(rule))
+                .assertMessage("All downloads succeeded!")
+                .clickOKOnDialog(new MainMenuPage())
                 .startBlankForm("One Question")
                 .answerQuestion("what is your age", "22")
                 .swipeToEndScreen()
-                .clickSaveAndExit()
+                .clickFinalize()
 
                 .clickDeleteSavedForm()
                 .clickBlankForms()
                 .clickForm("One Question")
                 .clickDeleteSelected(1)
                 .clickDeleteForms()
-                .pressBack(new MainMenuPage(rule))
+                .pressBack(new MainMenuPage())
 
                 .clickGetBlankForm()
                 .clickGetSelected()
-                .assertText("One Question (Version:: 1 ID: one_question) - Success")
-                .clickOK(new MainMenuPage(rule))
+                .assertMessage("All downloads succeeded!")
+                .clickOKOnDialog(new MainMenuPage())
                 .clickFillBlankForm()
                 .assertFormExists("One Question");
     }

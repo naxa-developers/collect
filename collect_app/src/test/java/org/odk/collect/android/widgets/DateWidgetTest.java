@@ -2,6 +2,8 @@ package org.odk.collect.android.widgets;
 
 import android.view.View;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
 import org.javarosa.core.model.QuestionDef;
 import org.javarosa.core.model.data.DateData;
 import org.javarosa.form.api.FormEntryPrompt;
@@ -9,14 +11,13 @@ import org.joda.time.LocalDateTime;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.R;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.listeners.WidgetValueChangedListener;
 import org.odk.collect.android.logic.DatePickerDetails;
-import org.odk.collect.android.support.TestScreenContextActivity;
+import org.odk.collect.android.support.WidgetTestActivity;
 import org.odk.collect.android.utilities.DateTimeUtils;
+import org.odk.collect.android.widgets.support.FakeWaitingForDataRegistry;
 import org.odk.collect.android.widgets.utilities.DateTimeWidgetUtils;
-import org.robolectric.RobolectricTestRunner;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -29,9 +30,9 @@ import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.prom
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.promptWithReadOnlyAndQuestionDef;
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.widgetTestActivity;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class DateWidgetTest {
-    private TestScreenContextActivity widgetActivity;
+    private WidgetTestActivity widgetActivity;
     private DateTimeWidgetUtils widgetUtils;
     private View.OnLongClickListener onLongClickListener;
 
@@ -58,7 +59,7 @@ public class DateWidgetTest {
     @Test
     public void whenPromptIsNotReadOnly_buttonShowsCorrectText() {
         DateWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
-        assertEquals(widget.binding.dateButton.getText(), widget.getContext().getString(R.string.select_date));
+        assertEquals(widget.binding.dateButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.select_date));
     }
 
     @Test
@@ -75,7 +76,7 @@ public class DateWidgetTest {
     @Test
     public void whenPromptDoesNotHaveAnswer_answerTextViewShowsNoDateSelected() {
         DateWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
-        assertEquals(widget.binding.dateAnswerText.getText(), widget.getContext().getString(R.string.no_date_selected));
+        assertEquals(widget.binding.dateAnswerText.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.no_date_selected));
     }
 
     @Test
@@ -112,7 +113,7 @@ public class DateWidgetTest {
     public void clearAnswer_clearsWidgetAnswer() {
         DateWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
         widget.clearAnswer();
-        assertEquals(widget.binding.dateAnswerText.getText(), widget.getContext().getString(R.string.no_date_selected));
+        assertEquals(widget.binding.dateAnswerText.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.no_date_selected));
     }
 
     @Test
@@ -153,7 +154,17 @@ public class DateWidgetTest {
                 DateTimeWidgetUtils.getDateTimeLabel(dateAnswer.toDate(), datePickerDetails, false, widget.getContext()));
     }
 
+    @Test
+    public void setData_callsValueChangeListener() {
+        DateWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
+        WidgetValueChangedListener valueChangedListener = mockValueChangedListener(widget);
+        widget.setValueChangedListener(valueChangedListener);
+        widget.setData(dateAnswer);
+
+        verify(valueChangedListener).widgetValueChanged(widget);
+    }
+
     private DateWidget createWidget(FormEntryPrompt prompt) {
-        return new DateWidget(widgetActivity, new QuestionDetails(prompt, "formAnalyticsID"), widgetUtils);
+        return new DateWidget(widgetActivity, new QuestionDetails(prompt), widgetUtils, new FakeWaitingForDataRegistry());
     }
 }

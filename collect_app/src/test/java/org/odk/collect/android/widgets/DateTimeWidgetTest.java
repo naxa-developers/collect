@@ -2,6 +2,8 @@ package org.odk.collect.android.widgets;
 
 import android.view.View;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
 import org.javarosa.core.model.QuestionDef;
 import org.javarosa.core.model.data.DateData;
 import org.javarosa.core.model.data.DateTimeData;
@@ -12,19 +14,19 @@ import org.joda.time.LocalDateTime;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.R;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.listeners.WidgetValueChangedListener;
 import org.odk.collect.android.logic.DatePickerDetails;
-import org.odk.collect.android.support.TestScreenContextActivity;
+import org.odk.collect.android.support.WidgetTestActivity;
 import org.odk.collect.android.utilities.DateTimeUtils;
+import org.odk.collect.android.widgets.support.FakeWaitingForDataRegistry;
 import org.odk.collect.android.widgets.utilities.DateTimeWidgetUtils;
-import org.robolectric.RobolectricTestRunner;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.mockValueChangedListener;
@@ -32,9 +34,9 @@ import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.prom
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.promptWithReadOnlyAndQuestionDef;
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.widgetTestActivity;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class DateTimeWidgetTest {
-    private TestScreenContextActivity widgetActivity;
+    private WidgetTestActivity widgetActivity;
     private DateTimeWidgetUtils widgetUtils;
     private View.OnLongClickListener onLongClickListener;
 
@@ -66,8 +68,8 @@ public class DateTimeWidgetTest {
     public void whenPromptIsNotReadOnly_buttonShowsCorrectText() {
         DateTimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
 
-        assertEquals(widget.binding.dateWidget.dateButton.getText(), widget.getContext().getString(R.string.select_date));
-        assertEquals(widget.binding.timeWidget.timeButton.getText(), widget.getContext().getString(R.string.select_time));
+        assertEquals(widget.binding.dateWidget.dateButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.select_date));
+        assertEquals(widget.binding.timeWidget.timeButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.select_time));
     }
 
     @Test
@@ -78,7 +80,7 @@ public class DateTimeWidgetTest {
     @Test
     public void getAnswer_whenPromptHasDateAnswer_returnsDateAnswerAndCurrentTime() {
         DateTimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, new DateTimeData(localDateTime.toDate())));
-        widget.binding.timeWidget.timeAnswerText.setText(widget.getContext().getString(R.string.no_time_selected));
+        widget.binding.timeWidget.timeAnswerText.setText(widget.getContext().getString(org.odk.collect.strings.R.string.no_time_selected));
 
         assertEquals(widget.getAnswer().getDisplayText(),
                 new DateTimeData(DateTimeUtils.getSelectedDate(localDateTime, LocalDateTime.now()).toDate()).getDisplayText());
@@ -87,7 +89,7 @@ public class DateTimeWidgetTest {
     @Test
     public void getAnswer_whenPromptHasTimeAnswer_returnsTimeAnswerAndCurrentDate() {
         DateTimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, new DateTimeData(localDateTime.toDate())));
-        widget.binding.dateWidget.dateAnswerText.setText(widget.getContext().getString(R.string.no_date_selected));
+        widget.binding.dateWidget.dateAnswerText.setText(widget.getContext().getString(org.odk.collect.strings.R.string.no_date_selected));
 
         assertEquals(widget.getAnswer().getDisplayText(),
                 new DateTimeData(DateTimeUtils.getSelectedTime(localDateTime, LocalDateTime.now()).toDate()).getDisplayText());
@@ -103,8 +105,8 @@ public class DateTimeWidgetTest {
     public void whenPromptDoesNotHaveAnswer_answerTextViewShowsNoValueSelected() {
         DateTimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
 
-        assertEquals(widget.binding.dateWidget.dateAnswerText.getText(), widget.getContext().getString(R.string.no_date_selected));
-        assertEquals(widget.binding.timeWidget.timeAnswerText.getText(), widget.getContext().getString(R.string.no_time_selected));
+        assertEquals(widget.binding.dateWidget.dateAnswerText.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.no_date_selected));
+        assertEquals(widget.binding.timeWidget.timeAnswerText.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.no_time_selected));
     }
 
     @Test
@@ -162,8 +164,8 @@ public class DateTimeWidgetTest {
         widget.clearAnswer();
 
         assertThat(widget.getAnswer(), nullValue());
-        assertEquals(widget.binding.dateWidget.dateAnswerText.getText(), widget.getContext().getString(R.string.no_date_selected));
-        assertEquals(widget.binding.timeWidget.timeAnswerText.getText(), widget.getContext().getString(R.string.no_time_selected));
+        assertEquals(widget.binding.dateWidget.dateAnswerText.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.no_date_selected));
+        assertEquals(widget.binding.timeWidget.timeAnswerText.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.no_time_selected));
     }
 
     @Test
@@ -237,7 +239,20 @@ public class DateTimeWidgetTest {
                 new DateTimeData(DateTimeUtils.getSelectedTime(((DateTime) answer).toLocalDateTime(), LocalDateTime.now()).toDate()).getDisplayText());
     }
 
+    @Test
+    public void setData_callsValueChangeListener() {
+        DateTimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
+        WidgetValueChangedListener valueChangedListener = mockValueChangedListener(widget);
+        widget.setValueChangedListener(valueChangedListener);
+
+        widget.setData(new LocalDateTime().withDate(2010, 5, 12));
+        verify(valueChangedListener, times(1)).widgetValueChanged(widget);
+
+        widget.setData(new DateTime().withDate(2010, 5, 12));
+        verify(valueChangedListener, times(2)).widgetValueChanged(widget);
+    }
+
     private DateTimeWidget createWidget(FormEntryPrompt prompt) {
-        return new DateTimeWidget(widgetActivity, new QuestionDetails(prompt, "formAnalyticsID"), widgetUtils);
+        return new DateTimeWidget(widgetActivity, new QuestionDetails(prompt), widgetUtils, new FakeWaitingForDataRegistry());
     }
 }

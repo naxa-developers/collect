@@ -5,6 +5,7 @@ import android.view.View;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.javarosa.core.model.SelectChoice;
 import org.javarosa.form.api.FormEntryPrompt;
@@ -12,10 +13,11 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.odk.collect.android.R;
+import org.odk.collect.android.support.CollectHelpers;
 import org.odk.collect.android.support.MockFormEntryPromptBuilder;
-import org.odk.collect.android.support.RobolectricHelpers;
-import org.odk.collect.android.support.TestScreenContextActivity;
-import org.robolectric.RobolectricTestRunner;
+import org.odk.collect.android.support.WidgetTestActivity;
+import org.odk.collect.android.utilities.MediaUtils;
+import org.odk.collect.testshared.RobolectricHelpers;
 
 import java.util.List;
 
@@ -25,7 +27,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.Mockito.mock;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class SelectMinimalDialogTest {
 
     protected FragmentManager fragmentManager;
@@ -34,7 +36,7 @@ public class SelectMinimalDialogTest {
 
     @Before
     public void setup() {
-        FragmentActivity activity = RobolectricHelpers.createThemedActivity(TestScreenContextActivity.class);
+        FragmentActivity activity = CollectHelpers.createThemedActivity(WidgetTestActivity.class);
         fragmentManager = activity.getSupportFragmentManager();
     }
 
@@ -42,11 +44,13 @@ public class SelectMinimalDialogTest {
     public void whenClickBackButton_shouldDialogBeClosed() {
         List<SelectChoice> items = getTestChoices();
         setUpFormEntryPrompt(items, "autocomplete");
-        dialogFragment = new SelectOneMinimalDialog(null, false, true, ApplicationProvider.getApplicationContext(), items, formEntryPrompt, null, 0, 1, false);
+        dialogFragment = new SelectOneMinimalDialog(null, false, true, ApplicationProvider.getApplicationContext(), items, formEntryPrompt, null, 0, 1, false, mock(MediaUtils.class));
         SelectMinimalDialog.SelectMinimalDialogListener listener = mock(SelectMinimalDialog.SelectMinimalDialogListener.class);
         dialogFragment.setListener(listener);
 
         dialogFragment.show(fragmentManager, "TAG");
+        RobolectricHelpers.runLooper();
+
         assertThat(isDialogVisible(), is(true));
         dialogFragment.onBackPressed();
         assertThat(isDialogVisible(), is(false));
@@ -56,11 +60,13 @@ public class SelectMinimalDialogTest {
     public void whenClickBackArrowButton_shouldDialogBeClosed() {
         List<SelectChoice> items = getTestChoices();
         setUpFormEntryPrompt(items, "autocomplete");
-        dialogFragment = new SelectOneMinimalDialog(null, false, true, ApplicationProvider.getApplicationContext(), items, formEntryPrompt, null, 0, 1, false);
+        dialogFragment = new SelectOneMinimalDialog(null, false, true, ApplicationProvider.getApplicationContext(), items, formEntryPrompt, null, 0, 1, false, mock(MediaUtils.class));
         SelectMinimalDialog.SelectMinimalDialogListener listener = mock(SelectMinimalDialog.SelectMinimalDialogListener.class);
         dialogFragment.setListener(listener);
 
         dialogFragment.show(fragmentManager, "TAG");
+        RobolectricHelpers.runLooper();
+
         assertThat(isDialogVisible(), is(true));
         dialogFragment.getToolbar().getChildAt(0).performClick();
         assertThat(isDialogVisible(), is(false));
@@ -70,11 +76,13 @@ public class SelectMinimalDialogTest {
     public void whenAutoCompleteAppearanceUsed_shouldSearchBarBeVisible() {
         List<SelectChoice> items = getTestChoices();
         setUpFormEntryPrompt(items, "autocomplete");
-        dialogFragment = new SelectOneMinimalDialog(null, false, true, ApplicationProvider.getApplicationContext(), items, formEntryPrompt, null, 0, 1, false);
+        dialogFragment = new SelectOneMinimalDialog(null, false, true, ApplicationProvider.getApplicationContext(), items, formEntryPrompt, null, 0, 1, false, mock(MediaUtils.class));
         SelectMinimalDialog.SelectMinimalDialogListener listener = mock(SelectMinimalDialog.SelectMinimalDialogListener.class);
         dialogFragment.setListener(listener);
 
         dialogFragment.show(fragmentManager, "TAG");
+        RobolectricHelpers.runLooper();
+
         assertThat(dialogFragment.getToolbar().findViewById(R.id.menu_filter).getVisibility(), equalTo(View.VISIBLE));
     }
 

@@ -1,6 +1,19 @@
 package org.odk.collect.android.widgets.items;
 
-import android.app.Application;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.odk.collect.android.support.CollectHelpers.setupFakeReferenceManager;
+import static org.odk.collect.testshared.RobolectricHelpers.populateRecyclerView;
+import static java.util.Arrays.asList;
+
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -21,37 +34,26 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
-import org.odk.collect.android.analytics.Analytics;
 import org.odk.collect.android.audio.AudioButton;
 import org.odk.collect.android.audio.AudioHelper;
 import org.odk.collect.android.formentry.media.AudioHelperFactory;
 import org.odk.collect.android.formentry.questions.AudioVideoImageTextLabel;
 import org.odk.collect.android.formentry.questions.NoButtonsItem;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.formentry.questions.QuestionTextSizeHelper;
 import org.odk.collect.android.injection.config.AppDependencyModule;
 import org.odk.collect.android.listeners.AdvanceToNextListener;
-import org.odk.collect.android.preferences.GeneralSharedPreferences;
+import org.odk.collect.android.listeners.WidgetValueChangedListener;
+import org.odk.collect.android.support.CollectHelpers;
 import org.odk.collect.android.support.MockFormEntryPromptBuilder;
-import org.odk.collect.android.support.RobolectricHelpers;
-import org.odk.collect.android.utilities.WidgetAppearanceUtils;
+import org.odk.collect.android.utilities.Appearances;
+import org.odk.collect.android.utilities.SoftKeyboardController;
 import org.odk.collect.android.widgets.base.GeneralSelectOneWidgetTest;
+import org.odk.collect.android.widgets.support.FormEntryPromptSelectChoiceLoader;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
 import org.odk.collect.async.Scheduler;
 import org.odk.collect.audioclips.Clip;
 
 import java.util.List;
-
-import static java.util.Arrays.asList;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.odk.collect.android.support.CollectHelpers.setupFakeReferenceManager;
-import static org.odk.collect.android.support.RobolectricHelpers.populateRecyclerView;
 
 /**
  * @author James Knight
@@ -63,10 +65,11 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
     @NonNull
     @Override
     public SelectOneWidget createWidget() {
-        SelectOneWidget selectOneWidget = new SelectOneWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID"), isQuick());
+        SelectOneWidget selectOneWidget = new SelectOneWidget(activity, new QuestionDetails(formEntryPrompt), isQuick(), null, new FormEntryPromptSelectChoiceLoader());
         if (isQuick()) {
             selectOneWidget.setListener(listener);
         }
+        selectOneWidget.setFocus(activity);
         return selectOneWidget;
     }
 
@@ -75,9 +78,6 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
 
     @Mock
     public AudioHelper audioHelper;
-
-    @Mock
-    public Analytics analytics;
 
     @Before
     public void setup() throws Exception {
@@ -112,7 +112,7 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
     @Test
     public void whenAutocompleteAppearanceExist_shouldTextSizeBeSetProperly() {
         when(formEntryPrompt.getAppearanceHint()).thenReturn("autocomplete");
-        assertThat(getSpyWidget().binding.choicesSearchBox.getTextSize(), is(new QuestionTextSizeHelper().getHeadline6()));
+        assertThat((int) getSpyWidget().binding.choicesSearchBox.getTextSize(), is(QuestionFontSizeUtils.getFontSize(settingsProvider.getUnprotectedSettings(), QuestionFontSizeUtils.FontSize.HEADLINE_6)));
     }
 
     @Test
@@ -125,6 +125,27 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
     public void whenAutocompleteAppearanceDoesNotExist_shouldSearchBoxBeHidden() {
         when(formEntryPrompt.getAppearanceHint()).thenReturn("");
         assertThat(getSpyWidget().binding.choicesSearchBox.getVisibility(), is(View.GONE));
+    }
+
+    @Test
+    public void whenAutocompleteAppearanceDoesNotExist_shouldNotKeyboardBeDisplayed() {
+        SelectOneWidget widget = getSpyWidget();
+        verify(widget.softKeyboardController, never()).showSoftKeyboard(widget.binding.choicesSearchBox);
+    }
+
+    @Test
+    public void whenAutocompleteAppearanceExist_shouldKeyboardBeDisplayed() {
+        when(formEntryPrompt.getAppearanceHint()).thenReturn("autocomplete");
+        SelectOneWidget widget = getSpyWidget();
+        verify(widget.softKeyboardController).showSoftKeyboard(widget.binding.choicesSearchBox);
+    }
+
+    @Test
+    public void whenAutocompleteAppearanceExistAndWidgetIsReadOnly_shouldNotKeyboardBeDisplayed() {
+        when(formEntryPrompt.getAppearanceHint()).thenReturn("autocomplete");
+        when(formEntryPrompt.isReadOnly()).thenReturn(true);
+        SelectOneWidget widget = getSpyWidget();
+        verify(widget.softKeyboardController, never()).showSoftKeyboard(widget.binding.choicesSearchBox);
     }
 
     @Test
@@ -222,24 +243,6 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
     }
 
     @Test
-    public void whenChoicesHaveAudio_logsAudioChoiceEvent() throws Exception {
-        formEntryPrompt = new MockFormEntryPromptBuilder()
-                .withIndex("i am index")
-                .withSelectChoices(asList(
-                        new SelectChoice("1", "1"),
-                        new SelectChoice("2", "2")
-                ))
-                .withSpecialFormSelectChoiceText(asList(
-                        new Pair<>(FormEntryCaption.TEXT_FORM_AUDIO, REFERENCES.get(0).first),
-                        new Pair<>(FormEntryCaption.TEXT_FORM_AUDIO, REFERENCES.get(1).first)
-                ))
-                .build();
-
-        populateRecyclerView(getWidget());
-        verify(analytics).logEvent("Prompt", "AudioChoice", "formAnalyticsID");
-    }
-
-    @Test
     public void whenAChoiceValueIsNull_selecting_doesNotSetAnswer() {
         SelectChoice selectChoice = new SelectChoice(); // The two arg constructor protects against null values
         selectChoice.setTextID("1");
@@ -276,7 +279,7 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
 
         // No-buttons appearance
         formEntryPrompt = new MockFormEntryPromptBuilder(formEntryPrompt)
-                .withAppearance(WidgetAppearanceUtils.NO_BUTTONS)
+                .withAppearance(Appearances.NO_BUTTONS)
                 .build();
 
         populateRecyclerView(getWidget());
@@ -285,9 +288,48 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
         assertThat(view.isEnabled(), is(Boolean.FALSE));
     }
 
+    @Test
+    public void clickingItem_callsValueChangedListener() {
+        formEntryPrompt = new MockFormEntryPromptBuilder()
+                .withIndex("i am index")
+                .withSelectChoices(asList(
+                        new SelectChoice("1", "1"),
+                        new SelectChoice("2", "2")
+                ))
+                .build();
+
+        SelectOneWidget widget = getWidget();
+        WidgetValueChangedListener valueChangedListener = mock();
+        widget.setValueChangedListener(valueChangedListener);
+        populateRecyclerView(widget);
+
+        ((AudioVideoImageTextLabel) getWidget().binding.choicesRecyclerView.getChildAt(0)).getLabelTextView().performClick();
+        verify(valueChangedListener).widgetValueChanged(widget);
+    }
+
+    @Test
+    public void whenPromptHasNoButtonsAppearance_clickingItem_callsValueChangedListener() {
+        formEntryPrompt = new MockFormEntryPromptBuilder()
+                .withIndex("i am index")
+                .withAppearance("no-buttons")
+                .withSelectChoices(asList(
+                        new SelectChoice("1", "1"),
+                        new SelectChoice("2", "2")
+                ))
+                .build();
+
+        SelectOneWidget widget = getWidget();
+        WidgetValueChangedListener valueChangedListener = mock();
+        widget.setValueChangedListener(valueChangedListener);
+        populateRecyclerView(widget);
+
+        getWidget().binding.choicesRecyclerView.getChildAt(0).performClick();
+        verify(valueChangedListener).widgetValueChanged(widget);
+    }
+
     private void overrideDependencyModule() throws Exception {
         ReferenceManager referenceManager = setupFakeReferenceManager(REFERENCES);
-        RobolectricHelpers.overrideAppDependencyModule(new AppDependencyModule() {
+        CollectHelpers.overrideAppDependencyModule(new AppDependencyModule() {
 
             @Override
             public ReferenceManager providesReferenceManager() {
@@ -300,14 +342,14 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
             }
 
             @Override
-            public Analytics providesAnalytics(Application application, GeneralSharedPreferences generalSharedPreferences) {
-                return analytics;
+            public SoftKeyboardController provideSoftKeyboardController() {
+                return mock(SoftKeyboardController.class);
             }
         });
     }
 
     private void clickChoice(SelectOneWidget widget, int index) {
-        if (WidgetAppearanceUtils.isNoButtonsAppearance(formEntryPrompt)) {
+        if (Appearances.isNoButtonsAppearance(formEntryPrompt)) {
             clickNoButtonChoice(widget, index);
         } else {
             clickButtonChoice(widget, index);
@@ -332,6 +374,6 @@ public class SelectOneWidgetTest extends GeneralSelectOneWidgetTest<SelectOneWid
     );
 
     private boolean isQuick() {
-        return WidgetAppearanceUtils.getSanitizedAppearanceHint(formEntryPrompt).contains("quick");
+        return Appearances.getSanitizedAppearanceHint(formEntryPrompt).contains("quick");
     }
 }

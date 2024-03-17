@@ -1,11 +1,11 @@
 /*
  * Copyright (C) 2009 University of Washington
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software distributed under the License
  * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
  * or implied. See the License for the specific language governing permissions and limitations under
@@ -13,6 +13,8 @@
  */
 
 package org.odk.collect.android.widgets.items;
+
+import static org.odk.collect.android.formentry.media.FormMediaUtils.getPlayColor;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -23,13 +25,12 @@ import org.javarosa.core.model.data.helper.Selection;
 import org.odk.collect.android.adapters.AbstractSelectListAdapter;
 import org.odk.collect.android.adapters.SelectMultipleListAdapter;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.utilities.WidgetAppearanceUtils;
+import org.odk.collect.android.utilities.Appearances;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
 import org.odk.collect.android.widgets.warnings.SpacesInUnderlyingValuesWarning;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.odk.collect.android.formentry.media.FormMediaUtils.getPlayColor;
 
 /**
  * SelectMultiWidget handles multiple selection fields using checkboxes.
@@ -39,8 +40,8 @@ import static org.odk.collect.android.formentry.media.FormMediaUtils.getPlayColo
  */
 @SuppressLint("ViewConstructor")
 public class SelectMultiWidget extends BaseSelectListWidget {
-    public SelectMultiWidget(Context context, QuestionDetails prompt) {
-        super(context, prompt);
+    public SelectMultiWidget(Context context, QuestionDetails prompt, SelectChoiceLoader selectChoiceLoader) {
+        super(context, prompt, selectChoiceLoader);
         SpacesInUnderlyingValuesWarning
                 .forQuestionWidget(this)
                 .renderWarningIfNecessary(items);
@@ -48,12 +49,12 @@ public class SelectMultiWidget extends BaseSelectListWidget {
 
     @Override
     protected AbstractSelectListAdapter setUpAdapter() {
-        int numColumns = WidgetAppearanceUtils.getNumberOfColumns(getFormEntryPrompt(), screenUtils);
-        boolean noButtonsMode = WidgetAppearanceUtils.isCompactAppearance(getFormEntryPrompt()) || WidgetAppearanceUtils.isNoButtonsAppearance(getFormEntryPrompt());
+        int numColumns = Appearances.getNumberOfColumns(getFormEntryPrompt(), screenUtils);
+        boolean noButtonsMode = Appearances.isCompactAppearance(getFormEntryPrompt()) || Appearances.isNoButtonsAppearance(getFormEntryPrompt());
 
         recyclerViewAdapter = new SelectMultipleListAdapter(getSelectedItems(), this, getContext(),
                 items, getFormEntryPrompt(), getReferenceManager(), getAudioHelper(),
-                getPlayColor(getFormEntryPrompt(), themeUtils), numColumns, noButtonsMode);
+                getPlayColor(getFormEntryPrompt(), themeUtils), numColumns, noButtonsMode, mediaUtils);
         return recyclerViewAdapter;
     }
 
@@ -83,5 +84,9 @@ public class SelectMultiWidget extends BaseSelectListWidget {
     @Override
     public void onItemClicked() {
         widgetValueChanged();
+    }
+
+    @Override
+    public void setOnLongClickListener(OnLongClickListener l) {
     }
 }

@@ -16,24 +16,33 @@ import org.odk.collect.android.adapters.AbstractSelectListAdapter;
 import org.odk.collect.android.databinding.SelectListWidgetAnswerBinding;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.listeners.SelectItemClickListener;
-import org.odk.collect.android.utilities.SoftKeyboardUtils;
-import org.odk.collect.android.utilities.WidgetAppearanceUtils;
+import org.odk.collect.android.utilities.Appearances;
+import org.odk.collect.android.widgets.QuestionWidget;
 import org.odk.collect.android.widgets.interfaces.MultiChoiceWidget;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
 import org.odk.collect.android.widgets.utilities.SearchQueryViewModel;
 
-import static org.odk.collect.android.analytics.AnalyticsEvents.PROMPT;
 import static org.odk.collect.android.formentry.media.FormMediaUtils.getPlayableAudioURI;
 
-public abstract class BaseSelectListWidget extends ItemsWidget implements MultiChoiceWidget, SelectItemClickListener {
+import java.util.List;
+
+public abstract class BaseSelectListWidget extends QuestionWidget implements MultiChoiceWidget, SelectItemClickListener {
 
     SelectListWidgetAnswerBinding binding;
     protected AbstractSelectListAdapter recyclerViewAdapter;
 
-    public BaseSelectListWidget(Context context, QuestionDetails questionDetails) {
+    final List<SelectChoice> items;
+
+    public BaseSelectListWidget(Context context, QuestionDetails questionDetails, SelectChoiceLoader selectChoiceLoader) {
         super(context, questionDetails);
+        render();
+
+        items = ItemsWidgetUtils.loadItemsAndHandleErrors(this, questionDetails.getPrompt(), selectChoiceLoader);
+
         logAnalytics(questionDetails);
-        binding.choicesRecyclerView.initRecyclerView(setUpAdapter(), WidgetAppearanceUtils.isFlexAppearance(getQuestionDetails().getPrompt()));
-        if (WidgetAppearanceUtils.isAutocomplete(getQuestionDetails().getPrompt())) {
+        binding.choicesRecyclerView.initRecyclerView(setUpAdapter(), Appearances.isFlexAppearance(getQuestionDetails().getPrompt()));
+        if (Appearances.isAutocomplete(getQuestionDetails().getPrompt())) {
             setUpSearchBox();
         }
     }
@@ -46,8 +55,8 @@ public abstract class BaseSelectListWidget extends ItemsWidget implements MultiC
 
     @Override
     public void setFocus(Context context) {
-        if (WidgetAppearanceUtils.isAutocomplete(getQuestionDetails().getPrompt())) {
-            SoftKeyboardUtils.showSoftKeyboard(binding.choicesSearchBox);
+        if (Appearances.isAutocomplete(getQuestionDetails().getPrompt()) && !questionDetails.isReadOnly()) {
+            softKeyboardController.showSoftKeyboard(binding.choicesSearchBox);
         }
     }
 
@@ -67,7 +76,7 @@ public abstract class BaseSelectListWidget extends ItemsWidget implements MultiC
         SearchQueryViewModel searchQueryViewModel = new ViewModelProvider(activity).get(SearchQueryViewModel.class);
 
         binding.choicesSearchBox.setVisibility(View.VISIBLE);
-        binding.choicesSearchBox.setTextSize(TypedValue.COMPLEX_UNIT_DIP, getAnswerFontSize());
+        binding.choicesSearchBox.setTextSize(TypedValue.COMPLEX_UNIT_DIP, QuestionFontSizeUtils.getFontSize(settings, QuestionFontSizeUtils.FontSize.HEADLINE_6));
         binding.choicesSearchBox.addTextChangedListener(new TextWatcher() {
             private String oldText = "";
 
@@ -98,7 +107,6 @@ public abstract class BaseSelectListWidget extends ItemsWidget implements MultiC
                 String audioURI = getPlayableAudioURI(questionDetails.getPrompt(), choice, getReferenceManager());
 
                 if (audioURI != null) {
-                    analytics.logEvent(PROMPT, "AudioChoice", questionDetails.getFormAnalyticsID());
                     break;
                 }
             }

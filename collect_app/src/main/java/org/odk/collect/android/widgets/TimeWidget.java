@@ -26,24 +26,28 @@ import org.javarosa.form.api.FormEntryPrompt;
 
 import org.joda.time.DateTime;
 import org.joda.time.LocalDateTime;
-import org.odk.collect.android.R;
 import org.odk.collect.android.databinding.TimeWidgetAnswerBinding;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.utilities.DateTimeUtils;
 import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
 import org.odk.collect.android.widgets.utilities.DateTimeWidgetUtils;
+import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
 
 @SuppressLint("ViewConstructor")
 public class TimeWidget extends QuestionWidget implements WidgetDataReceiver {
+    private final WaitingForDataRegistry waitingForDataRegistry;
     TimeWidgetAnswerBinding binding;
 
     private final DateTimeWidgetUtils widgetUtils;
 
     private LocalDateTime selectedTime;
 
-    public TimeWidget(Context context, final QuestionDetails prompt, DateTimeWidgetUtils widgetUtils) {
+    public TimeWidget(Context context, final QuestionDetails prompt, DateTimeWidgetUtils widgetUtils, WaitingForDataRegistry waitingForDataRegistry) {
         super(context, prompt);
+        render();
+
         this.widgetUtils = widgetUtils;
+        this.waitingForDataRegistry = waitingForDataRegistry;
     }
 
     @Override
@@ -53,10 +57,8 @@ public class TimeWidget extends QuestionWidget implements WidgetDataReceiver {
         if (prompt.isReadOnly()) {
             binding.timeButton.setVisibility(GONE);
         } else {
-            binding.timeButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, answerFontSize);
-
             binding.timeButton.setOnClickListener(v -> {
-                DateTimeWidgetUtils.setWidgetWaitingForData(prompt.getIndex());
+                waitingForDataRegistry.waitForData(prompt.getIndex());
                 widgetUtils.showTimePickerDialog(context, selectedTime);
             });
         }
@@ -76,13 +78,13 @@ public class TimeWidget extends QuestionWidget implements WidgetDataReceiver {
     @Override
     public void clearAnswer() {
         selectedTime = DateTimeUtils.getCurrentDateTime();
-        binding.timeAnswerText.setText(R.string.no_time_selected);
+        binding.timeAnswerText.setText(org.odk.collect.strings.R.string.no_time_selected);
         widgetValueChanged();
     }
 
     @Override
     public IAnswerData getAnswer() {
-        return binding.timeAnswerText.getText().equals(getContext().getString(R.string.no_time_selected))
+        return binding.timeAnswerText.getText().equals(getContext().getString(org.odk.collect.strings.R.string.no_time_selected))
                 ? null
                 : new TimeData(selectedTime.toDateTime().toDate());
     }
@@ -105,6 +107,7 @@ public class TimeWidget extends QuestionWidget implements WidgetDataReceiver {
         if (answer instanceof DateTime) {
             selectedTime = DateTimeUtils.getSelectedTime(((DateTime) answer).toLocalDateTime(), LocalDateTime.now());
             binding.timeAnswerText.setText(new TimeData(selectedTime.toDate()).getDisplayText());
+            widgetValueChanged();
         }
     }
 }

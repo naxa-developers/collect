@@ -9,6 +9,7 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.odk.collect.android.widgets.base.GeneralExStringWidgetTest;
 import org.odk.collect.android.widgets.support.FakeWaitingForDataRegistry;
+import org.odk.collect.android.widgets.utilities.StringRequester;
 
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -19,7 +20,7 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.when;
-import static org.odk.collect.android.utilities.WidgetAppearanceUtils.THOUSANDS_SEP;
+import static org.odk.collect.android.utilities.Appearances.THOUSANDS_SEP;
 
 /**
  * @author James Knight
@@ -30,10 +31,13 @@ public class ExDecimalWidgetTest extends GeneralExStringWidgetTest<ExDecimalWidg
     @Mock
     IAnswerData answerData;
 
+    @Mock
+    StringRequester stringRequester;
+
     @NonNull
     @Override
     public ExDecimalWidget createWidget() {
-        return new ExDecimalWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID"), new FakeWaitingForDataRegistry());
+        return new ExDecimalWidget(activity, new QuestionDetails(formEntryPrompt), new FakeWaitingForDataRegistry(), stringRequester);
     }
 
     @NonNull
@@ -66,19 +70,22 @@ public class ExDecimalWidgetTest extends GeneralExStringWidgetTest<ExDecimalWidg
         when(formEntryPrompt.getAnswerValue()).thenReturn(answerData);
         when(answerData.getValue()).thenReturn(eighteenDigitDouble);
 
-        ExDecimalWidget exDecimalWidget = new ExDecimalWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID"), new FakeWaitingForDataRegistry());
+        ExDecimalWidget exDecimalWidget = new ExDecimalWidget(activity, new QuestionDetails(formEntryPrompt), new FakeWaitingForDataRegistry(), stringRequester);
 
-        assertThat(exDecimalWidget.getAnswerText(), is(equalTo(fifteenDigitString)));
+        assertThat(exDecimalWidget.binding.widgetAnswerText.getAnswer(), is(equalTo(fifteenDigitString)));
 
-        exDecimalWidget = new ExDecimalWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID"), new FakeWaitingForDataRegistry());
+        exDecimalWidget = new ExDecimalWidget(activity, new QuestionDetails(formEntryPrompt), new FakeWaitingForDataRegistry(), stringRequester);
 
-        assertThat(exDecimalWidget.getAnswerText(), is(equalTo(fifteenDigitString)));
+        assertThat(exDecimalWidget.binding.widgetAnswerText.getAnswer(), is(equalTo(fifteenDigitString)));
     }
 
     @Test
     public void separatorsShouldBeAddedWhenEnabled() {
         when(formEntryPrompt.getAppearanceHint()).thenReturn(THOUSANDS_SEP);
-        getWidget().answerText.setText("123456789.54");
-        assertEquals("123,456,789.54", getWidget().answerText.getText().toString());
+        getWidget().binding.widgetAnswerText.setAnswer("123456789.54");
+
+        assertEquals("123,456,789.54", getWidget().binding.widgetAnswerText.getAnswer());
+        assertEquals("123,456,789.54", getWidget().binding.widgetAnswerText.getBinding().editText.getText().toString());
+        assertEquals("123,456,789.54", getWidget().binding.widgetAnswerText.getBinding().textView.getText().toString());
     }
 }

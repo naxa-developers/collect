@@ -1,8 +1,13 @@
 
 package org.odk.collect.android.formentry.audit;
 
+import static org.odk.collect.android.formentry.audit.AuditEvent.AuditEventType.LOCATION_PROVIDERS_DISABLED;
+import static org.odk.collect.android.formentry.audit.AuditEvent.AuditEventType.LOCATION_PROVIDERS_ENABLED;
+
 import android.location.Location;
 import android.os.SystemClock;
+
+import androidx.annotation.Nullable;
 
 import org.javarosa.core.model.FormIndex;
 import org.javarosa.core.model.data.IAnswerData;
@@ -11,11 +16,7 @@ import org.odk.collect.android.javarosawrapper.FormController;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.reactivex.annotations.Nullable;
 import timber.log.Timber;
-
-import static org.odk.collect.android.formentry.audit.AuditEvent.AuditEventType.LOCATION_PROVIDERS_DISABLED;
-import static org.odk.collect.android.formentry.audit.AuditEvent.AuditEventType.LOCATION_PROVIDERS_ENABLED;
 
 /**
  * Handle logging of auditEvents (which contain time and might contain location coordinates),
@@ -39,8 +40,6 @@ public class AuditEventLogger {
     private final AuditConfig auditConfig;
     private final FormController formController;
     private String user;
-    private boolean changesMade;
-    private boolean editing;
 
     public AuditEventLogger(AuditConfig auditConfig, AuditEventWriter writer, FormController formController) {
         this.auditConfig = auditConfig;
@@ -52,11 +51,16 @@ public class AuditEventLogger {
         logEvent(eventType, null, writeImmediatelyToDisk, null, currentTime, null);
     }
 
-    /*
-     * Log a new event
+    /**
+     * Logs events to the audit log. Can safely be used on a background thread, but should not be
+     * used on the UI thread.
      */
     public void logEvent(AuditEvent.AuditEventType eventType, FormIndex formIndex,
                          boolean writeImmediatelyToDisk, String questionAnswer, long currentTime, String changeReason) {
+        internalLog(eventType, formIndex, writeImmediatelyToDisk, questionAnswer, currentTime, changeReason);
+    }
+
+    private synchronized void internalLog(AuditEvent.AuditEventType eventType, FormIndex formIndex, boolean writeImmediatelyToDisk, String questionAnswer, long currentTime, String changeReason) {
         if (!isAuditEnabled() || shouldBeIgnored(eventType)) {
             return;
         }
@@ -98,9 +102,10 @@ public class AuditEventLogger {
     }
 
     /*
-     * Finalizes and writes events
+     * Finalizes and writes events. Can safely be used on a background thread, but should not be
+     * used on the UI thread.
      */
-    public void flush() {
+    public synchronized void flush() {
         if (isAuditEnabled()) {
             finalizeEvents();
             writeEvents();
@@ -117,11 +122,7 @@ public class AuditEventLogger {
 
     private void addNewValueToQuestionAuditEvent(AuditEvent aev, FormController formController) {
         IAnswerData answerData = formController.getQuestionPrompt(aev.getFormIndex()).getAnswerValue();
-        boolean valueChanged = aev.recordValueChange(answerData != null ? answerData.getDisplayText() : null);
-
-        if (valueChanged) {
-            this.changesMade = true;
-        }
+        aev.recordValueChange(answerData != null ? answerData.getDisplayText() : null);
     }
 
     // If location provider are enabled/disabled it sometimes fires the BroadcastReceiver multiple
@@ -285,18 +286,6 @@ public class AuditEventLogger {
 
     public boolean isChangeReasonRequired() {
         return auditConfig != null && auditConfig.isTrackChangesReasonEnabled();
-    }
-
-    public boolean isChangesMade() {
-        return changesMade;
-    }
-
-    public void setEditing(boolean editing) {
-        this.editing = editing;
-    }
-
-    public boolean isEditing() {
-        return editing;
     }
 
     public interface AuditEventWriter {

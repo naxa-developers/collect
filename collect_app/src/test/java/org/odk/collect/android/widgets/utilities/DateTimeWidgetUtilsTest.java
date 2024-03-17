@@ -1,12 +1,12 @@
 package org.odk.collect.android.widgets.utilities;
 
 import androidx.fragment.app.DialogFragment;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.joda.time.LocalDateTime;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.activities.FormEntryActivity;
 import org.odk.collect.android.fragments.dialogs.BikramSambatDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.CopticDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.CustomTimePickerDialog;
@@ -16,9 +16,11 @@ import org.odk.collect.android.fragments.dialogs.IslamicDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.MyanmarDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.PersianDatePickerDialog;
 import org.odk.collect.android.logic.DatePickerDetails;
-import org.odk.collect.android.support.RobolectricHelpers;
-import org.robolectric.RobolectricTestRunner;
+import org.odk.collect.testshared.RobolectricHelpers;
+import org.odk.collect.android.support.WidgetTestActivity;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -31,11 +33,13 @@ import static org.odk.collect.android.logic.DatePickerDetails.DatePickerType.ISL
 import static org.odk.collect.android.logic.DatePickerDetails.DatePickerType.MYANMAR;
 import static org.odk.collect.android.logic.DatePickerDetails.DatePickerType.PERSIAN;
 
-@RunWith(RobolectricTestRunner.class)
+import android.app.DatePickerDialog;
+
+@RunWith(AndroidJUnit4.class)
 public class DateTimeWidgetUtilsTest {
     private DateTimeWidgetUtils dateTimeWidgetUtils;
 
-    private FormEntryActivity activity;
+    private WidgetTestActivity activity;
     private DatePickerDetails datePickerDetails;
     private LocalDateTime date;
 
@@ -72,7 +76,7 @@ public class DateTimeWidgetUtilsTest {
     public void setUp() {
         dateTimeWidgetUtils = new DateTimeWidgetUtils();
 
-        activity = RobolectricHelpers.createThemedActivity(FormEntryActivity.class, 0);
+        activity = RobolectricHelpers.createThemedActivity(WidgetTestActivity.class);
         datePickerDetails = mock(DatePickerDetails.class);
 
         when(datePickerDetails.getDatePickerType()).thenReturn(GREGORIAN);
@@ -235,6 +239,19 @@ public class DateTimeWidgetUtilsTest {
     @Test
     public void displayDatePickerDialog_showsPersianDatePickerDialog_whenDatePickerTypeIsPersian() {
         assertDialogIsShowing(PERSIAN, PersianDatePickerDialog.class);
+    }
+
+    @Test
+    public void displayDatePickerDialogWithYearMode_showsDatePickerWithDayAndMonthFixedToJanuaryFirst() {
+        when(datePickerDetails.getDatePickerType()).thenReturn(GREGORIAN);
+
+        dateTimeWidgetUtils.showDatePickerDialog(activity, gregorianYear, date);
+        DialogFragment dialog = (DialogFragment) activity.getSupportFragmentManager()
+                .findFragmentByTag(FixedDatePickerDialog.class.getName());
+
+        assertThat(((DatePickerDialog) dialog.getDialog()).getDatePicker().getYear(), is(date.getYear()));
+        assertThat(((DatePickerDialog) dialog.getDialog()).getDatePicker().getMonth(), is(0));
+        assertThat(((DatePickerDialog) dialog.getDialog()).getDatePicker().getDayOfMonth(), is(1));
     }
 
     private void assertDialogIsShowing(DatePickerDetails.DatePickerType datePickerType, Class dialogClass) {

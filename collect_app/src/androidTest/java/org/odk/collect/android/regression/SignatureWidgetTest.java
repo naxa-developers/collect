@@ -1,8 +1,5 @@
 package org.odk.collect.android.regression;
 
-import android.Manifest;
-
-import androidx.test.rule.GrantPermissionRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.junit.Rule;
@@ -10,12 +7,10 @@ import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
 import org.odk.collect.android.R;
-import org.odk.collect.android.support.CollectTestRule;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
 import org.odk.collect.android.support.pages.FormEntryPage;
-import org.odk.collect.android.support.pages.MainMenuPage;
-import org.odk.collect.android.support.pages.SaveOrIgnoreDialog;
+import org.odk.collect.android.support.pages.SaveOrIgnoreDrawingDialog;
+import org.odk.collect.android.support.rules.CollectTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
 
 // Issue number NODK-211
 @RunWith(AndroidJUnit4.class)
@@ -24,64 +19,59 @@ public class SignatureWidgetTest {
     public CollectTestRule rule = new CollectTestRule();
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_PHONE_STATE)
-            )
-            .around(new ResetStateRule())
-            .around(new CopyFormRule("All_widgets.xml"))
+    public RuleChain copyFormChain = TestRuleChain.chain()
             .around(rule);
 
     @Test
     public void saveIgnoreDialog_ShouldUseBothOptions() {
 
         //TestCase1
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("all-widgets.xml")
                 .startBlankForm("All widgets")
                 .clickGoToArrow()
                 .clickOnText("Image widgets")
                 .clickOnQuestion("Signature widget")
-                .clickWidgetButton()
+                .clickOnId(R.id.sign_button)
                 .waitForRotationToEnd()
-                .pressBack(new SaveOrIgnoreDialog<>("Gather Signature", new FormEntryPage("All widgets", rule), rule))
+                .pressBack(new SaveOrIgnoreDrawingDialog<>("Gather Signature", new FormEntryPage("All widgets")))
                 .checkIsTranslationDisplayed("Exit Gather Signature", "Salir Adjuntar firma")
-                .assertText(R.string.keep_changes)
-                .clickIgnoreChanges()
+                .assertText(org.odk.collect.strings.R.string.keep_changes)
+                .clickDiscardChanges()
                 .waitForRotationToEnd()
-                .clickWidgetButton()
+                .clickOnId(R.id.sign_button)
                 .waitForRotationToEnd()
-                .pressBack(new SaveOrIgnoreDialog<>("Gather Signature", new FormEntryPage("All widgets", rule), rule))
+                .pressBack(new SaveOrIgnoreDrawingDialog<>("Gather Signature", new FormEntryPage("All widgets")))
                 .clickSaveChanges()
                 .waitForRotationToEnd()
                 .clickGoToArrow()
                 .clickJumpEndButton()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
     @Test
     public void multiClickOnPlus_ShouldDisplayIcons() {
 
         //TestCase2
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("all-widgets.xml")
                 .startBlankForm("All widgets")
                 .clickGoToArrow()
                 .clickOnText("Image widgets")
                 .clickOnQuestion("Signature widget")
-                .clickWidgetButton()
+                .clickOnId(R.id.sign_button)
                 .waitForRotationToEnd()
-                .clickOnId(R.id.fab_actions)
-                .checkIsIdDisplayed(R.id.fab_save_and_close)
-                .clickOnId(R.id.fab_set_color)
-                .clickOnString(R.string.ok)
-                .clickOnId(R.id.fab_actions)
-                .checkIsIdDisplayed(R.id.fab_set_color)
-                .pressBack(new SaveOrIgnoreDialog<>("Gather Signature", new FormEntryPage("All widgets", rule), rule))
+                .clickOnId(org.odk.collect.draw.R.id.fab_actions)
+                .checkIsIdDisplayed(org.odk.collect.draw.R.id.fab_save_and_close)
+                .clickOnId(org.odk.collect.draw.R.id.fab_set_color)
+                .clickOnString(org.odk.collect.strings.R.string.ok)
+                .clickOnId(org.odk.collect.draw.R.id.fab_actions)
+                .checkIsIdDisplayed(org.odk.collect.draw.R.id.fab_set_color)
+                .pressBack(new SaveOrIgnoreDrawingDialog<>("Gather Signature", new FormEntryPage("All widgets")))
                 .clickSaveChanges()
                 .waitForRotationToEnd()
                 .clickGoToArrow()
                 .clickJumpEndButton()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 }

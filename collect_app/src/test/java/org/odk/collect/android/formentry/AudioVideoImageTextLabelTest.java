@@ -3,9 +3,9 @@ package org.odk.collect.android.formentry;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.RadioButton;
-import android.widget.Toast;
 
 import androidx.lifecycle.MutableLiveData;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -18,9 +18,9 @@ import org.odk.collect.android.R;
 import org.odk.collect.android.audio.AudioButton;
 import org.odk.collect.android.audio.AudioHelper;
 import org.odk.collect.android.formentry.questions.AudioVideoImageTextLabel;
-import org.odk.collect.android.support.TestScreenContextActivity;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.shadows.ShadowToast;
+import org.odk.collect.android.support.WidgetTestActivity;
+import org.odk.collect.android.utilities.MediaUtils;
+import org.odk.collect.imageloader.ImageLoader;
 
 import java.io.File;
 
@@ -29,13 +29,13 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.odk.collect.android.support.RobolectricHelpers.createThemedActivity;
+import static org.odk.collect.android.support.CollectHelpers.createThemedActivity;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class AudioVideoImageTextLabelTest {
 
     @Rule
@@ -44,11 +44,11 @@ public class AudioVideoImageTextLabelTest {
     @Mock
     public AudioHelper audioHelper;
 
-    private TestScreenContextActivity activity;
+    private WidgetTestActivity activity;
 
     @Before
     public void setup() {
-        activity = createThemedActivity(TestScreenContextActivity.class);
+        activity = createThemedActivity(WidgetTestActivity.class);
     }
 
     @Test
@@ -107,7 +107,7 @@ public class AudioVideoImageTextLabelTest {
         when(imageFile.exists()).thenReturn(true);
 
         AudioVideoImageTextLabel audioVideoImageTextLabel = new AudioVideoImageTextLabel(activity);
-        audioVideoImageTextLabel.setImage(imageFile);
+        audioVideoImageTextLabel.setImage(imageFile, mock(ImageLoader.class));
         audioVideoImageTextLabel.setTextView(new RadioButton(activity));
 
         assertThat(((RadioButton) audioVideoImageTextLabel.getLabelTextView()).isChecked(), is(false));
@@ -131,7 +131,7 @@ public class AudioVideoImageTextLabelTest {
         when(imageFile.exists()).thenReturn(true);
 
         AudioVideoImageTextLabel audioVideoImageTextLabel = new AudioVideoImageTextLabel(activity);
-        audioVideoImageTextLabel.setImage(imageFile);
+        audioVideoImageTextLabel.setImage(imageFile, mock(ImageLoader.class));
         audioVideoImageTextLabel.setTextView(new CheckBox(activity));
 
         assertThat(((CheckBox) audioVideoImageTextLabel.getLabelTextView()).isChecked(), is(false));
@@ -151,7 +151,7 @@ public class AudioVideoImageTextLabelTest {
         when(imageFile.exists()).thenReturn(true);
 
         AudioVideoImageTextLabel audioVideoImageTextLabel = new AudioVideoImageTextLabel(activity);
-        audioVideoImageTextLabel.setImage(imageFile);
+        audioVideoImageTextLabel.setImage(imageFile, mock(ImageLoader.class));
         audioVideoImageTextLabel.setTextView(new RadioButton(activity));
 
         assertThat(((RadioButton) audioVideoImageTextLabel.getLabelTextView()).isChecked(), is(false));
@@ -179,7 +179,7 @@ public class AudioVideoImageTextLabelTest {
         when(imageFile.exists()).thenReturn(true);
 
         AudioVideoImageTextLabel audioVideoImageTextLabel = new AudioVideoImageTextLabel(activity);
-        audioVideoImageTextLabel.setImage(imageFile);
+        audioVideoImageTextLabel.setImage(imageFile, mock(ImageLoader.class));
         audioVideoImageTextLabel.setTextView(new CheckBox(activity));
 
         assertThat(((CheckBox) audioVideoImageTextLabel.getLabelTextView()).isChecked(), is(false));
@@ -206,21 +206,24 @@ public class AudioVideoImageTextLabelTest {
         File imageFile = new File("file://image.png");
 
         AudioVideoImageTextLabel audioVideoImageTextLabel = new AudioVideoImageTextLabel(activity);
-        audioVideoImageTextLabel.setImage(imageFile);
+        audioVideoImageTextLabel.setImage(imageFile, mock(ImageLoader.class));
 
         assertThat(audioVideoImageTextLabel.getMissingImage().getVisibility(), is(VISIBLE));
         assertThat(audioVideoImageTextLabel.getMissingImage().getText().toString(), is("File: file:/image.png is missing."));
     }
 
     @Test
-    public void whenVideoFileDoesNotExist_ShouldAnAppropriateMessageBeDisplayed() {
-        File videoFile = new File("file://video.mp4");
+    public void whenVideoFileClicked_ShouldMediaUtilsBeCalled() {
+        MediaUtils mediaUtils = mock(MediaUtils.class);
+
+        File videoFile = mock(File.class);
+        when(videoFile.exists()).thenReturn(true);
 
         AudioVideoImageTextLabel audioVideoImageTextLabel = new AudioVideoImageTextLabel(activity);
         audioVideoImageTextLabel.setVideo(videoFile);
+        audioVideoImageTextLabel.setMediaUtils(mediaUtils);
         audioVideoImageTextLabel.getVideoButton().performClick();
 
-        assertEquals(ShadowToast.getTextOfLatestToast(), "File: file:/video.mp4 is missing.");
-        assertEquals(ShadowToast.getLatestToast().getDuration(), Toast.LENGTH_LONG);
+        verify(mediaUtils).openFile(activity, videoFile, "video/*");
     }
 }

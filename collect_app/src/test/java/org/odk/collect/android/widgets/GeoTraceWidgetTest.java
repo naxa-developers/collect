@@ -2,18 +2,18 @@ package org.odk.collect.android.widgets;
 
 import android.view.View;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
 import org.javarosa.core.model.data.StringData;
 import org.javarosa.form.api.FormEntryPrompt;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.R;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.geo.MapConfigurator;
+import org.odk.collect.maps.MapConfigurator;
 import org.odk.collect.android.listeners.WidgetValueChangedListener;
 import org.odk.collect.android.widgets.interfaces.GeoDataRequester;
 import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
-import org.robolectric.RobolectricTestRunner;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -29,7 +29,7 @@ import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.prom
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.promptWithReadOnlyAndAnswer;
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.widgetTestActivity;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class GeoTraceWidgetTest {
     private final String answer = stringFromDoubleList();
 
@@ -78,19 +78,19 @@ public class GeoTraceWidgetTest {
     @Test
     public void whenPromptIsReadOnlyAndHasAnswer_viewGeoShapeButtonIsShown() {
         GeoTraceWidget widget = createWidget(promptWithReadOnlyAndAnswer(new StringData(answer)));
-        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(R.string.geotrace_view_read_only));
+        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.geotrace_view_read_only));
     }
 
     @Test
     public void whenPromptIsNotReadOnlyAndDoesNotHaveAnswer_startGeoShapeButtonIsShown() {
         GeoTraceWidget widget = createWidget(promptWithAnswer(null));
-        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(R.string.get_trace));
+        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.get_trace));
     }
 
     @Test
     public void whenPromptIsNotReadOnlyAndHasAnswer_viewOrChangeGeoShapeButtonIsShown() {
         GeoTraceWidget widget = createWidget(promptWithAnswer(new StringData(answer)));
-        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(R.string.geotrace_view_change_location));
+        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.geotrace_view_change_location));
     }
 
     @Test
@@ -99,7 +99,7 @@ public class GeoTraceWidgetTest {
         widget.clearAnswer();
 
         assertEquals(widget.binding.geoAnswerText.getText(), "");
-        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(R.string.get_trace));
+        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.get_trace));
     }
 
     @Test
@@ -149,14 +149,14 @@ public class GeoTraceWidgetTest {
     public void setData_whenDataIsNull_updatesButtonLabel() {
         GeoTraceWidget widget = createWidget(promptWithAnswer(new StringData(answer)));
         widget.setData("");
-        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(R.string.get_trace));
+        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.get_trace));
     }
 
     @Test
     public void setData_whenDataIsNotNull_updatesButtonLabel() {
         GeoTraceWidget widget = createWidget(promptWithAnswer(null));
         widget.setData(answer);
-        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(R.string.geotrace_view_change_location));
+        assertEquals(widget.binding.simpleButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.geotrace_view_change_location));
     }
 
     @Test
@@ -176,7 +176,7 @@ public class GeoTraceWidgetTest {
         when(mapConfigurator.isAvailable(widget.getContext())).thenReturn(false);
         widget.binding.simpleButton.performClick();
 
-        verify(geoDataRequester, never()).requestGeoTrace(widget.getContext(), prompt, "",  waitingForDataRegistry);
+        verify(geoDataRequester, never()).requestGeoTrace(prompt, "",  waitingForDataRegistry);
         verify(mapConfigurator).showUnavailableMessage(widget.getContext());
     }
 
@@ -186,7 +186,7 @@ public class GeoTraceWidgetTest {
         GeoTraceWidget widget = createWidget(prompt);
         widget.binding.simpleButton.performClick();
 
-        verify(geoDataRequester).requestGeoTrace(widget.getContext(), prompt, "", waitingForDataRegistry);
+        verify(geoDataRequester).requestGeoTrace(prompt, "", waitingForDataRegistry);
     }
 
     @Test
@@ -196,7 +196,7 @@ public class GeoTraceWidgetTest {
         widget.clearAnswer();
         widget.binding.simpleButton.performClick();
 
-        verify(geoDataRequester).requestGeoTrace(widget.getContext(), prompt, "", waitingForDataRegistry);
+        verify(geoDataRequester).requestGeoTrace(prompt, "", waitingForDataRegistry);
     }
 
     @Test
@@ -206,11 +206,11 @@ public class GeoTraceWidgetTest {
         widget.setData(answer);
         widget.binding.simpleButton.performClick();
 
-        verify(geoDataRequester).requestGeoTrace(widget.getContext(), prompt, answer, waitingForDataRegistry);
+        verify(geoDataRequester).requestGeoTrace(prompt, answer, waitingForDataRegistry);
     }
 
     private GeoTraceWidget createWidget(FormEntryPrompt prompt) {
-        return new GeoTraceWidget(widgetTestActivity(), new QuestionDetails(prompt, "formAnalyticsID"),
+        return new GeoTraceWidget(widgetTestActivity(), new QuestionDetails(prompt),
                 waitingForDataRegistry, mapConfigurator, geoDataRequester);
     }
 }

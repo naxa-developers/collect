@@ -24,7 +24,7 @@ limitations under the License.
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:layout_alignParentTop="true"
-        tools:src="@drawable/ic_website" />
+        tools:src="@drawable/ic_outline_website_24" />
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -46,7 +46,7 @@ limitations under the License.
             style="@style/TextAppearance.Collect.Body2.MediumEmphasis"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/margin_extra_small"
+            android:layout_marginTop="@dimen/margin_extra_extra_small"
             tools:text="@string/odk_website_summary" />
 
     </LinearLayout>

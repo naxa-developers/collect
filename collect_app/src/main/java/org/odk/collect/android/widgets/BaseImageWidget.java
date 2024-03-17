@@ -20,9 +20,7 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.net.Uri;
-import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -30,34 +28,27 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.IdRes;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.StringData;
 import org.javarosa.core.reference.InvalidReferenceException;
-import org.odk.collect.android.R;
-import org.odk.collect.android.activities.DrawActivity;
+import org.odk.collect.draw.DrawActivity;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.storage.StoragePathProvider;
 import org.odk.collect.android.utilities.ApplicationConstants;
-import org.odk.collect.android.utilities.MultiClickGuard;
-import org.odk.collect.android.utilities.FileUtils;
-import org.odk.collect.android.utilities.MediaUtils;
 import org.odk.collect.android.utilities.QuestionMediaManager;
-import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
 import org.odk.collect.android.widgets.interfaces.FileWidget;
+import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
 import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
+import org.odk.collect.androidshared.ui.multiclicksafe.MultiClickGuard;
+import org.odk.collect.imageloader.GlideImageLoader;
 
 import java.io.File;
 
 import timber.log.Timber;
 
-import static org.odk.collect.android.formentry.questions.WidgetViewUtils.createAnswerImageView;
-
 public abstract class BaseImageWidget extends QuestionWidget implements FileWidget, WidgetDataReceiver {
 
-    @Nullable
     protected ImageView imageView;
     protected String binaryName;
     protected TextView errorTextView;
@@ -68,14 +59,16 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
 
     private final WaitingForDataRegistry waitingForDataRegistry;
     private final QuestionMediaManager questionMediaManager;
-    private final MediaUtils mediaUtils;
+    protected final String tmpImageFilePath;
 
     public BaseImageWidget(Context context, QuestionDetails prompt, QuestionMediaManager questionMediaManager,
-                           WaitingForDataRegistry waitingForDataRegistry, MediaUtils mediaUtils) {
+                           WaitingForDataRegistry waitingForDataRegistry, String tmpImageFilePath) {
         super(context, prompt);
         this.questionMediaManager = questionMediaManager;
         this.waitingForDataRegistry = waitingForDataRegistry;
-        this.mediaUtils = mediaUtils;
+        this.tmpImageFilePath = tmpImageFilePath;
+
+        binaryName = getFormEntryPrompt().getAnswerText();
     }
 
     @Override
@@ -86,39 +79,36 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
     @Override
     public void clearAnswer() {
         deleteFile();
-        if (imageView != null) {
-            imageView.setImageDrawable(null);
-        }
-
+        imageView.setImageDrawable(null);
+        imageView.setVisibility(View.GONE);
         errorTextView.setVisibility(View.GONE);
         widgetValueChanged();
     }
 
     @Override
     public void deleteFile() {
-        questionMediaManager.deleteAnswerFile(getFormEntryPrompt().getIndex().toString(),
-                        getInstanceFolder() + File.separator + binaryName);
+        questionMediaManager.deleteAnswerFile(getFormEntryPrompt().getIndex().toString(), binaryName);
         binaryName = null;
     }
 
     @Override
-    public void setData(Object newImageObj) {
-        // you are replacing an answer. delete the previous image using the
-        // content provider.
+    public void setData(Object object) {
         if (binaryName != null) {
             deleteFile();
         }
 
-        File newImage = (File) newImageObj;
-        if (newImage.exists()) {
-            questionMediaManager.replaceAnswerFile(getFormEntryPrompt().getIndex().toString(), newImage.getAbsolutePath());
-            binaryName = newImage.getName();
-            Timber.i("Setting current answer to %s", newImage.getName());
-
-            addCurrentImageToLayout();
-            widgetValueChanged();
+        if (object instanceof File) {
+            File newImage = (File) object;
+            if (newImage.exists()) {
+                questionMediaManager.replaceAnswerFile(getFormEntryPrompt().getIndex().toString(), newImage.getAbsolutePath());
+                binaryName = newImage.getName();
+                updateAnswer();
+                widgetValueChanged();
+            } else {
+                Timber.e(new Error("NO IMAGE EXISTS at: " + newImage.getAbsolutePath()));
+            }
         } else {
-            Timber.e("NO IMAGE EXISTS at: %s", newImage.getAbsolutePath());
+            Timber.e(new Error("ImageWidget's setBinaryData must receive a File object."));
         }
     }
 
@@ -137,42 +127,27 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
         }
     }
 
-    protected void addCurrentImageToLayout() {
-        answerLayout.removeView(imageView);
+    protected void updateAnswer() {
+        imageView.setVisibility(View.GONE);
+        errorTextView.setVisibility(View.GONE);
 
         if (binaryName != null) {
-            DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
-            int screenWidth = metrics.widthPixels;
-            int screenHeight = metrics.heightPixels;
-
             File f = getFile();
-            if (f.exists()) {
-                Bitmap bmp = FileUtils.getBitmapScaledToDisplay(f, screenHeight, screenWidth);
-                if (bmp == null) {
-                    errorTextView.setVisibility(View.VISIBLE);
-                } else {
-                    imageView = createAnswerImageView(getContext(), bmp);
-                    imageView.setOnClickListener(v -> {
-                        if (imageClickHandler != null) {
-                            imageClickHandler.clickImage("viewImage");
-                        }
-                    });
+            if (f != null && f.exists()) {
+                imageView.setVisibility(View.VISIBLE);
+                imageLoader.loadImage(imageView, f, ImageView.ScaleType.FIT_CENTER, new GlideImageLoader.ImageLoaderCallback() {
+                    @Override
+                    public void onLoadFailed() {
+                        imageView.setVisibility(View.GONE);
+                        errorTextView.setVisibility(View.VISIBLE);
+                    }
 
-                    answerLayout.addView(imageView);
-                }
+                    @Override
+                    public void onLoadSucceeded() {
+                    }
+                });
             }
         }
-    }
-
-    protected void setUpLayout() {
-        errorTextView = new TextView(getContext());
-        errorTextView.setId(View.generateViewId());
-        errorTextView.setText(R.string.selected_invalid_image);
-
-        answerLayout = new LinearLayout(getContext());
-        answerLayout.setOrientation(LinearLayout.VERTICAL);
-
-        binaryName = getFormEntryPrompt().getAnswerText();
     }
 
     /**
@@ -181,7 +156,7 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
      * @param intent to add extras
      * @return intent with added extras
      */
-    public abstract Intent addExtrasToIntent(@NonNull Intent intent);
+    public abstract Intent addExtrasToIntent(Intent intent);
 
     /**
      * Interface for Clicking on Images
@@ -197,7 +172,8 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
 
         @Override
         public void clickImage(String context) {
-            mediaUtils.openFile(getContext(), new File(getInstanceFolder() + File.separator + binaryName));
+            mediaUtils.openFile(getContext(), questionMediaManager.getAnswerFile(binaryName),
+                    "image/*");
         }
     }
 
@@ -224,13 +200,14 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
         }
 
         private void launchDrawActivity() {
-            errorTextView.setVisibility(View.GONE);
             Intent i = new Intent(getContext(), DrawActivity.class);
             i.putExtra(DrawActivity.OPTION, drawOption);
-            if (binaryName != null) {
-                i.putExtra(DrawActivity.REF_IMAGE, Uri.fromFile(getFile()));
+            File file = getFile();
+            if (file != null && file.exists()) {
+                i.putExtra(DrawActivity.REF_IMAGE, Uri.fromFile(file));
             }
-            i.putExtra(DrawActivity.EXTRA_OUTPUT, Uri.fromFile(new File(new StoragePathProvider().getTmpImageFilePath())));
+
+            i.putExtra(DrawActivity.EXTRA_OUTPUT, Uri.fromFile(new File(tmpImageFilePath)));
             i = addExtrasToIntent(i);
             launchActivityForResult(i, requestCode, stringResourceId);
         }
@@ -257,7 +234,6 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
 
         @Override
         public void chooseImage(@IdRes final int stringResource) {
-            errorTextView.setVisibility(View.GONE);
             Intent i = new Intent(Intent.ACTION_GET_CONTENT);
             i.setType("image/*");
             launchActivityForResult(i, ApplicationConstants.RequestCodes.IMAGE_CHOOSER, stringResource);
@@ -267,8 +243,8 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
     /**
      * Standard method for launching an Activity.
      *
-     * @param intent - The Intent to start
-     * @param resourceCode - Code to return when Activity exits
+     * @param intent              - The Intent to start
+     * @param resourceCode        - Code to return when Activity exits
      * @param errorStringResource - String resource for error toast
      */
     protected void launchActivityForResult(Intent intent, final int resourceCode, final int errorStringResource) {
@@ -277,16 +253,26 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
             ((Activity) getContext()).startActivityForResult(intent, resourceCode);
         } catch (ActivityNotFoundException e) {
             Toast.makeText(getContext(),
-                    getContext().getString(R.string.activity_not_found, getContext().getString(errorStringResource)),
+                    getContext().getString(org.odk.collect.strings.R.string.activity_not_found, getContext().getString(errorStringResource)),
                     Toast.LENGTH_SHORT).show();
             waitingForDataRegistry.cancelWaitingForData();
         }
     }
 
+    @Nullable
     private File getFile() {
-        File file = new File(getInstanceFolder() + File.separator + binaryName);
-        if (!file.exists() && doesSupportDefaultValues()) {
-            file = new File(getDefaultFilePath());
+        if (binaryName == null) {
+            return null;
+        }
+
+        File file = questionMediaManager.getAnswerFile(binaryName);
+        if ((file == null || !file.exists()) && doesSupportDefaultValues()) {
+            String filePath = getDefaultFilePath();
+            if (filePath != null) {
+                return new File(getDefaultFilePath());
+            } else {
+                return null;
+            }
         }
 
         return file;
@@ -299,13 +285,16 @@ public abstract class BaseImageWidget extends QuestionWidget implements FileWidg
             Timber.w(e);
         }
 
-        return "";
+        return null;
     }
 
     protected abstract boolean doesSupportDefaultValues();
 
-    @Nullable
     public ImageView getImageView() {
         return imageView;
+    }
+
+    public TextView getErrorTextView() {
+        return errorTextView;
     }
 }

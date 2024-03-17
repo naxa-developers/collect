@@ -16,48 +16,11 @@
 
 package org.odk.collect.android.feature.formentry;
 
-import android.Manifest;
-import android.app.Activity;
-import android.app.Instrumentation;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.view.View;
-import android.widget.RatingBar;
-
-import androidx.test.core.app.ApplicationProvider;
-import androidx.test.espresso.UiController;
-import androidx.test.espresso.ViewAction;
-import androidx.test.espresso.contrib.RecyclerViewActions;
-import androidx.test.espresso.intent.rule.IntentsTestRule;
-import androidx.test.espresso.matcher.ViewMatchers;
-import androidx.test.rule.GrantPermissionRule;
-
-import org.hamcrest.Matcher;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.RuleChain;
-import org.odk.collect.android.R;
-import org.odk.collect.android.activities.FormEntryActivity;
-import org.odk.collect.android.preferences.GeneralKeys;
-import org.odk.collect.android.preferences.GeneralSharedPreferences;
-import org.odk.collect.android.preferences.GuidanceHint;
-import org.odk.collect.android.storage.StoragePathProvider;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
-import org.odk.collect.android.support.FormLoadingUtils;
-import org.odk.collect.android.support.pages.FormEntryPage;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Random;
-import java.util.UUID;
-
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.longClick;
 import static androidx.test.espresso.action.ViewActions.replaceText;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.assertion.PositionAssertions.isCompletelyAbove;
 import static androidx.test.espresso.assertion.PositionAssertions.isCompletelyBelow;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
@@ -77,24 +40,58 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.core.IsNot.not;
 import static org.hamcrest.core.StringStartsWith.startsWith;
-import static org.odk.collect.android.support.actions.NestedScrollToAction.nestedScrollTo;
-import static org.odk.collect.android.support.CustomMatchers.withIndex;
+import static org.odk.collect.android.support.matchers.CustomMatchers.withIndex;
+
+import android.app.Activity;
+import android.app.Application;
+import android.app.Instrumentation;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.view.View;
+import android.widget.RatingBar;
+
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.espresso.UiController;
+import androidx.test.espresso.ViewAction;
+import androidx.test.espresso.contrib.RecyclerViewActions;
+import androidx.test.espresso.matcher.ViewMatchers;
+
+import org.hamcrest.Matcher;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.RuleChain;
+import org.odk.collect.android.R;
+import org.odk.collect.android.injection.DaggerUtils;
+import org.odk.collect.android.preferences.GuidanceHint;
+import org.odk.collect.android.storage.StoragePathProvider;
+import org.odk.collect.android.support.pages.FormEntryPage;
+import org.odk.collect.android.support.rules.BlankFormTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
+import org.odk.collect.androidtest.RecordedIntentsRule;
+import org.odk.collect.settings.keys.ProjectKeys;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Random;
+import java.util.UUID;
 
 public class FieldListUpdateTest {
+
     private static final String FIELD_LIST_TEST_FORM = "fieldlist-updates.xml";
 
-    @Rule
-    public IntentsTestRule<FormEntryActivity> activityTestRule = FormLoadingUtils.getFormActivityTestRuleFor(FIELD_LIST_TEST_FORM);
+    public BlankFormTestRule rule = new BlankFormTestRule(
+            FIELD_LIST_TEST_FORM,
+            "fieldlist-updates",
+            Collections.singletonList("fruits.csv")
+    );
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.CAMERA)
-            )
-            .around(new ResetStateRule())
-            .around(new CopyFormRule(FIELD_LIST_TEST_FORM, Collections.singletonList("fruits.csv"), true));
+    public RuleChain copyFormChain = TestRuleChain.chain()
+            .around(new RecordedIntentsRule())
+            .around(rule);
 
     @Test
     public void relevanceChangeAtEnd_ShouldToggleLastWidgetVisibility() {
@@ -144,19 +141,20 @@ public class FieldListUpdateTest {
 
     @Test
     public void longPress_ShouldClearAndUpdate() {
-        jumpToGroupWithText("Single relevance in middle");
-        onView(withText("Source3")).perform(click());
+        rule.startInFormEntry()
+                .clickGoToArrow()
+                .clickGoUpIcon()
+                .clickOnGroup("Single relevance in middle")
+                .clickOnQuestion("Source3")
+                .answerQuestion(0, "")
+                .assertTextDoesNotExist("Target3")
+                .answerQuestion(0, "A")
+                .assertText("Target3")
 
-        onView(withIndex(withClassName(endsWith("EditText")), 0)).perform(replaceText(""));
-        onView(withText("Target3")).check(doesNotExist());
-        onView(withIndex(withClassName(endsWith("EditText")), 0)).perform(replaceText("A"));
-        onView(withText("Target3")).check(matches(isDisplayed()));
-
-        onView(withText("Source3")).perform(longClick());
-        onView(withText(R.string.clear_answer)).perform(click());
-        onView(withText(R.string.discard_answer)).perform(click());
-        onView(withIndex(withClassName(endsWith("EditText")), 0)).check(matches(withText("")));
-        onView(withText("Target3")).check(doesNotExist());
+                .longPressOnQuestion("Source3")
+                .removeResponse()
+                .assertTextDoesNotExist("A")
+                .assertTextDoesNotExist("Target3");
     }
 
     @Test
@@ -237,7 +235,7 @@ public class FieldListUpdateTest {
 
         // Selecting A1 for level 2 should reveal options for A1 at level 3
         onView(withText("A1")).perform(click());
-        onView(withText("A1A")).perform(nestedScrollTo());
+        onView(withText("A1A")).perform(scrollTo());
         onView(withText("A1A")).check(matches(isDisplayed()));
         onView(withText("B1")).check(doesNotExist());
         onView(withText("C1")).check(doesNotExist());
@@ -252,12 +250,12 @@ public class FieldListUpdateTest {
 
         onView(withText("A")).perform(click());
 
-        onView(withText("A1")).perform(nestedScrollTo(), click());
-        onView(withText("A1B")).perform(nestedScrollTo(), click());
+        onView(withText("A1")).perform(scrollTo(), click());
+        onView(withText("A1B")).perform(scrollTo(), click());
 
-        onView(withText("Level1")).perform(nestedScrollTo(), longClick());
-        onView(withText(R.string.clear_answer)).perform(click());
-        onView(withText(R.string.discard_answer)).perform(click());
+        onView(withText("Level1")).perform(scrollTo(), longClick());
+        onView(withText(org.odk.collect.strings.R.string.clear_answer)).perform(click());
+        onView(withText(org.odk.collect.strings.R.string.discard_answer)).perform(click());
 
         onView(withIndex(withClassName(endsWith("RadioButton")), 0)).check(matches(isNotChecked()));
         onView(withText("A1")).check(doesNotExist());
@@ -266,31 +264,27 @@ public class FieldListUpdateTest {
 
     @Test
     public void selectionChangeAtOneCascadeLevelWithMinimalAppearance_ShouldUpdateNextLevels() {
-        new FormEntryPage("fieldlist-updates", activityTestRule)
+        new FormEntryPage("fieldlist-updates")
                 .clickGoToArrow()
                 .clickGoUpIcon()
                 .clickOnGroup("Cascading select minimal")
                 .clickOnQuestion("Level1")
-                .assertTextDoesNotExist("A1", "B1", "C1", "A1A") // No choices should be shown for levels 2 and 3 when no selection is made for level 1
+                .assertTextsDoNotExist("A1", "B1", "C1", "A1A") // No choices should be shown for levels 2 and 3 when no selection is made for level 1
                 .openSelectMinimalDialog(0)
                 .clickOnText("C") // Selecting C for level 1 should only reveal options for C at level 2
-                .closeSelectMinimalDialog()
-                .assertTextDoesNotExist("A1", "B1")
+                .assertTextsDoNotExist("A1", "B1")
                 .openSelectMinimalDialog(1)
                 .clickOnText("C1")
-                .closeSelectMinimalDialog()
                 .assertTextDoesNotExist("A1A")
                 .clickOnText("C")
                 .clickOnText("A") // Selecting A for level 1 should reveal options for A at level 2
-                .closeSelectMinimalDialog()
                 .openSelectMinimalDialog(1)
                 .assertText("A1")
-                .assertTextDoesNotExist("A1A", "B1", "C1")
+                .assertTextsDoNotExist("A1A", "B1", "C1")
                 .clickOnText("A1") // Selecting A1 for level 2 should reveal options for A1 at level 3
-                .closeSelectMinimalDialog()
                 .openSelectMinimalDialog(2)
                 .assertText("A1A")
-                .assertTextDoesNotExist("B1A", "B1", "C1");
+                .assertTextsDoNotExist("B1A", "B1", "C1");
     }
 
     @Test
@@ -314,7 +308,7 @@ public class FieldListUpdateTest {
 
         onView(withText("Target10-15")).check(doesNotExist());
 
-        // FormEntryActivity expects an image at a fixed path so copy the app logo there
+        // FormFillingActivity expects an image at a fixed path so copy the app logo there
         Bitmap icon = BitmapFactory.decodeResource(ApplicationProvider.getApplicationContext().getResources(), R.drawable.notes);
         File tmpJpg = new File(new StoragePathProvider().getTmpImageFilePath());
         tmpJpg.createNewFile();
@@ -323,15 +317,19 @@ public class FieldListUpdateTest {
 
         intending(not(isInternal())).respondWith(new Instrumentation.ActivityResult(Activity.RESULT_OK, null));
 
-        onView(withId(R.id.capture_image)).perform(click());
+        onView(withId(R.id.capture_button)).perform(click());
 
         onView(withText("Target10-15")).check(matches(withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE)));
-        onView(withId(R.id.capture_image)).check(matches(isCompletelyDisplayed()));
+        onView(withId(R.id.capture_button)).check(matches(isCompletelyDisplayed()));
     }
 
     @Test
     public void changeInValueUsedInGuidanceHint_ShouldChangeGuidanceHintText() {
-        GeneralSharedPreferences.getInstance().save(GeneralKeys.KEY_GUIDANCE_HINT, GuidanceHint.Yes.toString());
+        DaggerUtils.getComponent(ApplicationProvider.<Application>getApplicationContext())
+                .settingsProvider()
+                .getUnprotectedSettings()
+                .save(ProjectKeys.KEY_GUIDANCE_HINT, GuidanceHint.YES.toString());
+
         jumpToGroupWithText("Guidance hint");
         onView(withText(startsWith("Source11"))).perform(click());
 
@@ -348,7 +346,7 @@ public class FieldListUpdateTest {
 
         onView(withText("Target12")).check(doesNotExist());
 
-        onView(withText(R.string.select_date)).perform(click());
+        onView(withText(org.odk.collect.strings.R.string.select_date)).perform(click());
         onView(withId(android.R.id.button1)).perform(click());
 
         onView(withText("Target12")).check(matches(isDisplayed()));
@@ -364,8 +362,8 @@ public class FieldListUpdateTest {
         onView(withText("Target13")).check(matches(isDisplayed()));
 
         onView(withText("Source13")).perform(longClick());
-        onView(withText(R.string.clear_answer)).perform(click());
-        onView(withText(R.string.discard_answer)).perform(click());
+        onView(withText(org.odk.collect.strings.R.string.clear_answer)).perform(click());
+        onView(withText(org.odk.collect.strings.R.string.discard_answer)).perform(click());
         onView(withText("Target13")).check(doesNotExist());
     }
 
@@ -382,17 +380,45 @@ public class FieldListUpdateTest {
 
     @Test
     public void searchMinimalInFieldList() {
-        new FormEntryPage("fieldlist-updates", activityTestRule)
+        new FormEntryPage("fieldlist-updates")
                 .clickGoToArrow()
                 .clickGoUpIcon()
                 .clickOnGroup("Search in field-list")
                 .clickOnQuestion("Source15")
                 .openSelectMinimalDialog()
-                .assertText("Mango", "Oranges", "Strawberries")
+                .assertTexts("Mango", "Oranges", "Strawberries")
                 .clickOnText("Strawberries")
-                .closeSelectMinimalDialog()
                 .assertText("Target15")
                 .assertSelectMinimalDialogAnswer("Strawberries");
+    }
+
+    @Test
+    @Ignore("https://github.com/getodk/collect/issues/5996")
+    public void listOfQuestionsShouldNotBeScrolledToTheLastEditedQuestionAfterClickingOnAQuestion() {
+        new FormEntryPage("fieldlist-updates")
+                .clickGoToArrow()
+                .clickGoUpIcon()
+                .clickOnGroup("Long list of questions")
+                .clickOnQuestion("Question1")
+                .answerQuestion(0, "X")
+                .activateTextQuestion(19)
+                .checkIsTranslationDisplayed("Question20");
+    }
+
+    @Test
+    public void recordingAudio_ShouldChangeRelevanceOfRelatedField() {
+        new FormEntryPage("fieldlist-updates")
+                .clickGoToArrow()
+                .clickGoUpIcon()
+                .clickOnGroup("Audio")
+                .clickOnQuestion("Source16")
+                .assertTextDoesNotExist("Target16")
+                .clickOnString(org.odk.collect.strings.R.string.capture_audio)
+                .clickOnContentDescription(org.odk.collect.strings.R.string.stop_recording)
+                .checkIsTranslationDisplayed("Target16")
+                .clickOnString(org.odk.collect.strings.R.string.delete_answer_file)
+                .clickOnButtonInDialog(org.odk.collect.strings.R.string.delete_answer_file, new FormEntryPage("fieldlist-updates"))
+                .assertTextDoesNotExist("Target16");
     }
 
     // Scroll down until the desired group name is visible. This is needed to make the tests work

@@ -31,6 +31,7 @@ import android.widget.TextView;
 
 import androidx.appcompat.widget.AppCompatCheckBox;
 
+import org.javarosa.core.model.SelectChoice;
 import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.SelectMultiData;
 import org.javarosa.core.model.data.helper.Selection;
@@ -38,10 +39,14 @@ import org.javarosa.core.reference.InvalidReferenceException;
 import org.javarosa.core.reference.ReferenceManager;
 import org.javarosa.form.api.FormEntryCaption;
 import org.odk.collect.android.R;
-import org.odk.collect.android.external.ExternalSelectChoice;
+import org.odk.collect.android.dynamicpreload.ExternalSelectChoice;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.utilities.FileUtils;
+import org.odk.collect.android.utilities.HtmlUtils;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
+import org.odk.collect.androidshared.bitmap.ImageFileUtils;
+import org.odk.collect.android.widgets.QuestionWidget;
 import org.odk.collect.android.widgets.interfaces.MultiChoiceWidget;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
 import org.odk.collect.android.widgets.warnings.SpacesInUnderlyingValuesWarning;
 
 import java.io.File;
@@ -62,15 +67,21 @@ import timber.log.Timber;
  * @author Jeff Beorse (jeff@beorse.net)
  */
 @SuppressLint("ViewConstructor")
-public class ListMultiWidget extends ItemsWidget implements MultiChoiceWidget {
+public class ListMultiWidget extends QuestionWidget implements MultiChoiceWidget {
 
     final ArrayList<CheckBox> checkBoxes;
+    private final boolean displayLabel;
+    private final List<SelectChoice> items;
 
     @SuppressWarnings("unchecked")
-    public ListMultiWidget(Context context, QuestionDetails questionDetails, boolean displayLabel) {
+    public ListMultiWidget(Context context, QuestionDetails questionDetails, boolean displayLabel, SelectChoiceLoader selectChoiceLoader) {
         super(context, questionDetails);
+        render();
+
+        items = ItemsWidgetUtils.loadItemsAndHandleErrors(this, questionDetails.getPrompt(), selectChoiceLoader);
 
         checkBoxes = new ArrayList<>();
+        this.displayLabel = displayLabel;
 
         // Layout holds the horizontal list of buttons
         LinearLayout buttonLayout = findViewById(R.id.answer_container);
@@ -142,7 +153,7 @@ public class ListMultiWidget extends ItemsWidget implements MultiChoiceWidget {
                                 DisplayMetrics metrics = context.getResources().getDisplayMetrics();
                                 int screenWidth = metrics.widthPixels;
                                 int screenHeight = metrics.heightPixels;
-                                b = FileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
+                                b = ImageFileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
                             } catch (OutOfMemoryError e) {
                                 errorMsg = "ERROR: " + e.getMessage();
                             }
@@ -157,19 +168,19 @@ public class ListMultiWidget extends ItemsWidget implements MultiChoiceWidget {
                                 // An error hasn't been logged and loading the image failed, so it's
                                 // likely
                                 // a bad file.
-                                errorMsg = getContext().getString(R.string.file_invalid, imageFile);
+                                errorMsg = getContext().getString(org.odk.collect.strings.R.string.file_invalid, imageFile);
 
                             }
                         } else {
                             // An error hasn't been logged. We should have an image, but the file
                             // doesn't
                             // exist.
-                            errorMsg = getContext().getString(R.string.file_missing, imageFile);
+                            errorMsg = getContext().getString(org.odk.collect.strings.R.string.file_missing, imageFile);
                         }
 
                         if (errorMsg != null) {
                             // errorMsg is only set when an error has occured
-                            Timber.e(errorMsg);
+                            Timber.e(new Error(errorMsg));
                             missingImage = new TextView(getContext());
                             missingImage.setText(errorMsg);
 
@@ -185,8 +196,8 @@ public class ListMultiWidget extends ItemsWidget implements MultiChoiceWidget {
                 // build text label. Don't assign the text to the built in label to he
                 // button because it aligns horizontally, and we want the label on top
                 TextView label = new TextView(getContext());
-                label.setText(questionDetails.getPrompt().getSelectChoiceText(items.get(i)));
-                label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, getAnswerFontSize());
+                label.setText(HtmlUtils.textToHtml(questionDetails.getPrompt().getSelectChoiceText(items.get(i))));
+                label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, QuestionFontSizeUtils.getFontSize(settings, QuestionFontSizeUtils.FontSize.HEADLINE_6));
                 label.setGravity(Gravity.CENTER_HORIZONTAL);
                 if (!displayLabel) {
                     label.setVisibility(View.GONE);
@@ -298,5 +309,9 @@ public class ListMultiWidget extends ItemsWidget implements MultiChoiceWidget {
     @Override
     protected int getLayout() {
         return R.layout.label_widget;
+    }
+
+    public boolean shouldDisplayLabel() {
+        return displayLabel;
     }
 }

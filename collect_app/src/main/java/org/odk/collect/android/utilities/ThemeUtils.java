@@ -14,73 +14,43 @@
 
 package org.odk.collect.android.utilities;
 
-import android.content.Context;
-import android.util.TypedValue;
+import static android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
+import static androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
+import static androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO;
+import static androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES;
+import static org.odk.collect.androidshared.system.ContextUtils.getThemeAttributeValue;
 
-import androidx.annotation.AttrRes;
+import android.content.Context;
+
 import androidx.annotation.ColorInt;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.StyleRes;
+import androidx.appcompat.app.AppCompatDelegate;
 
 import org.odk.collect.android.R;
-import org.odk.collect.android.preferences.GeneralKeys;
-import org.odk.collect.android.preferences.PreferencesProvider;
+import org.odk.collect.android.injection.DaggerUtils;
+import org.odk.collect.settings.SettingsProvider;
+import org.odk.collect.settings.keys.ProjectKeys;
 
+import javax.inject.Inject;
+
+/**
+ * @deprecated Use
+ * {@link org.odk.collect.androidshared.system.ContextUtils#getThemeAttributeValue(Context, int)}
+ * intead.
+ */
+@Deprecated
 public final class ThemeUtils {
 
+    @Inject
+    SettingsProvider settingsProvider;
+
     private final Context context;
-    private final PreferencesProvider preferencesProvider;
 
     public ThemeUtils(Context context) {
+        DaggerUtils.getComponent(context).inject(this);
         this.context = context;
-        this.preferencesProvider = new PreferencesProvider(context);
-    }
-
-    @StyleRes
-    public int getAppTheme() {
-        if (isMagentaEnabled()) {
-            return R.style.Theme_Collect_Magenta;
-        } else {
-            String theme = getPrefsTheme();
-            if (theme.equals(context.getString(R.string.app_theme_dark))) {
-                return R.style.Theme_Collect_Dark;
-            } else {
-                return R.style.Theme_Collect_Light;
-            }
-        }
-    }
-
-    @StyleRes
-    public int getFormEntryActivityTheme() {
-        if (isMagentaEnabled()) {
-            return R.style.Theme_Collect_Activity_FormEntryActivity_Magenta;
-        } else {
-            String theme = getPrefsTheme();
-            if (theme.equals(context.getString(R.string.app_theme_dark))) {
-                return R.style.Theme_Collect_Activity_FormEntryActivity_Dark;
-            } else {
-                return R.style.Theme_Collect_Activity_FormEntryActivity_Light;
-            }
-        }
-    }
-
-    @StyleRes
-    public int getSettingsTheme() {
-        if (isMagentaEnabled()) {
-            return R.style.Theme_Collect_Settings_Magenta;
-        } else {
-            String theme = getPrefsTheme();
-            if (theme.equals(context.getString(R.string.app_theme_dark))) {
-                return R.style.Theme_Collect_Settings_Dark;
-            } else {
-                return R.style.Theme_Collect_Settings_Light;
-            }
-        }
-    }
-
-    @StyleRes
-    public int getBottomDialogTheme() {
-        return isDarkTheme() ? R.style.Theme_Collect_MaterialDialogSheet_Dark : R.style.Theme_Collect_MaterialDialogSheet_Light;
     }
 
     @DrawableRes
@@ -88,46 +58,60 @@ public final class ThemeUtils {
         return isDarkTheme() ? android.R.drawable.divider_horizontal_dark : android.R.drawable.divider_horizontal_bright;
     }
 
-    public boolean isHoloDialogTheme(int theme) {
-        return theme == android.R.style.Theme_Holo_Light_Dialog ||
-                theme == android.R.style.Theme_Holo_Dialog;
+    public boolean isSpinnerDatePickerDialogTheme(int theme) {
+        return theme == R.style.Theme_Collect_Dark_Spinner_DatePicker_Dialog ||
+                theme == R.style.Theme_Collect_Light_Spinner_DatePicker_Dialog;
     }
 
     @StyleRes
-    public int getMaterialDialogTheme() {
+    public int getCalendarDatePickerDialogTheme() {
         return isDarkTheme()
-                ? R.style.Theme_Collect_Dark_Dialog
-                : R.style.Theme_Collect_Light_Dialog;
+                ? R.style.Theme_Collect_Dark_Calendar_DatePicker_Dialog
+                : R.style.Theme_Collect_Light_Calendar_DatePicker_Dialog;
     }
 
     @StyleRes
-    public int getHoloDialogTheme() {
+    public int getSpinnerDatePickerDialogTheme() {
         return isDarkTheme() ?
-                android.R.style.Theme_Holo_Dialog :
-                android.R.style.Theme_Holo_Light_Dialog;
+                R.style.Theme_Collect_Dark_Spinner_DatePicker_Dialog :
+                R.style.Theme_Collect_Light_Spinner_DatePicker_Dialog;
     }
 
-    private int getAttributeValue(@AttrRes int resId) {
-        TypedValue outValue = new TypedValue();
-        context.getTheme().resolveAttribute(resId, outValue, true);
-        return outValue.data;
+    @StyleRes
+    public int getSpinnerTimePickerDialogTheme() {
+        return isDarkTheme() ?
+                R.style.Theme_Collect_Dark_Spinner_TimePicker_Dialog :
+                R.style.Theme_Collect_Light_Spinner_TimePicker_Dialog;
     }
 
     public int getAccountPickerTheme() {
         return isDarkTheme() ? 0 : 1;
     }
 
-    public boolean isDarkTheme() {
-        String theme = getPrefsTheme();
-        return theme.equals(context.getString(R.string.app_theme_dark));
+    public boolean isSystemTheme() {
+        return getPrefsTheme().equals(context.getString(org.odk.collect.strings.R.string.app_theme_system));
     }
 
-    private boolean isMagentaEnabled() {
-        return preferencesProvider.getGeneralSharedPreferences().getBoolean(GeneralKeys.KEY_MAGENTA_THEME, false);
+    public boolean isDarkTheme() {
+        if (isSystemTheme()) {
+            int uiMode = context.getResources().getConfiguration().uiMode;
+            return (uiMode & UI_MODE_NIGHT_MASK) == UI_MODE_NIGHT_YES;
+        } else {
+            String theme = getPrefsTheme();
+            return theme.equals(context.getString(org.odk.collect.strings.R.string.app_theme_dark));
+        }
+    }
+
+    public void setDarkModeForCurrentProject() {
+        if (isSystemTheme()) {
+            AppCompatDelegate.setDefaultNightMode(MODE_NIGHT_FOLLOW_SYSTEM);
+        } else {
+            AppCompatDelegate.setDefaultNightMode(isDarkTheme() ? MODE_NIGHT_YES : MODE_NIGHT_NO);
+        }
     }
 
     private String getPrefsTheme() {
-        return preferencesProvider.getGeneralSharedPreferences().getString(GeneralKeys.KEY_APP_THEME, "light_theme");
+        return settingsProvider.getUnprotectedSettings().getString(ProjectKeys.KEY_APP_THEME);
     }
 
     /**
@@ -135,31 +119,16 @@ public final class ThemeUtils {
      */
     @ColorInt
     public int getColorOnSurface() {
-        return getAttributeValue(R.attr.colorOnSurface);
+        return getThemeAttributeValue(context, com.google.android.material.R.attr.colorOnSurface);
     }
 
     @ColorInt
     public int getAccentColor() {
-        return getAttributeValue(R.attr.colorAccent);
-    }
-
-    @ColorInt
-    public int getIconColor() {
-        return getAttributeValue(R.attr.colorOnSurface);
+        return getThemeAttributeValue(context, com.google.android.material.R.attr.colorAccent);
     }
 
     @ColorInt
     public int getColorPrimary() {
-        return getAttributeValue(R.attr.colorPrimary);
-    }
-
-    @ColorInt
-    public int getColorOnPrimary() {
-        return getAttributeValue(R.attr.colorOnPrimary);
-    }
-
-    @ColorInt
-    public int getColorSecondary() {
-        return getAttributeValue(R.attr.colorSecondary);
+        return getThemeAttributeValue(context, com.google.android.material.R.attr.colorPrimary);
     }
 }

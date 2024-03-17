@@ -1,20 +1,15 @@
 package org.odk.collect.android.regression;
 
-import android.Manifest;
-
-import androidx.test.rule.GrantPermissionRule;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.odk.collect.android.R;
-import org.odk.collect.android.support.CollectTestRule;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
-import org.odk.collect.android.support.pages.AdminSettingsPage;
-import org.odk.collect.android.support.pages.ExitFormDialog;
-import org.odk.collect.android.support.pages.GeneralSettingsPage;
+import org.odk.collect.android.support.pages.AccessControlPage;
 import org.odk.collect.android.support.pages.MainMenuPage;
+import org.odk.collect.android.support.pages.ProjectSettingsPage;
+import org.odk.collect.android.support.pages.SaveOrDiscardFormDialog;
+import org.odk.collect.android.support.rules.CollectTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
 
 //Issue NODK-243
 public class FormEntrySettingsTest {
@@ -22,55 +17,51 @@ public class FormEntrySettingsTest {
     public CollectTestRule rule = new CollectTestRule();
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_PHONE_STATE)
-            )
-            .around(new ResetStateRule())
-            .around(new CopyFormRule("All_widgets.xml"))
+    public RuleChain copyFormChain = TestRuleChain.chain()
             .around(rule);
 
     @SuppressWarnings("PMD.AvoidCallingFinalize")
     @Test
     public void movingBackwards_shouldBeTurnedOn() {
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+        rule.startAtMainMenu()
+                .copyForm("all-widgets.xml")
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .openFormManagement()
                 .openConstraintProcessing()
-                .clickOnString(R.string.constraint_behavior_on_finalize)
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
-                .clickOnMenu()
-                .clickAdminSettings()
+                .clickOnString(org.odk.collect.strings.R.string.constraint_behavior_on_finalize)
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new MainMenuPage())
+                .openProjectSettingsDialog()
+                .clickSettings()
+                .clickAccessControl()
                 .clickFormEntrySettings()
                 .clickMovingBackwards()
-                .assertText(R.string.moving_backwards_disabled_title)
-                .assertText(R.string.yes)
-                .assertText(R.string.no)
-                .clickOnString(R.string.yes)
-                .checkIfSaveFormOptionIsDisabled()
-                .pressBack(new AdminSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
-                .clickOnMenu()
-                .clickGeneralSettings()
+                .assertText(org.odk.collect.strings.R.string.moving_backwards_disabled_title)
+                .assertText(org.odk.collect.strings.R.string.yes)
+                .assertText(org.odk.collect.strings.R.string.no)
+                .clickOnString(org.odk.collect.strings.R.string.yes)
+                .assertSaveAsDraftInFormEntryDisabled()
+                .pressBack(new AccessControlPage())
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new MainMenuPage())
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .openFormManagement()
                 .scrollToConstraintProcessing()
                 .checkIfConstraintProcessingIsDisabled()
-                .assertTextDoesNotExist(R.string.constraint_behavior_on_finalize)
-                .assertText(R.string.constraint_behavior_on_swipe)
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
+                .assertTextDoesNotExist(org.odk.collect.strings.R.string.constraint_behavior_on_finalize)
+                .assertText(org.odk.collect.strings.R.string.constraint_behavior_on_swipe)
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new MainMenuPage())
                 .checkIfElementIsGone(R.id.review_data)
                 .startBlankForm("All widgets")
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("String widget")
                 .closeSoftKeyboard()
                 .swipeToPreviousQuestion("String widget")
-                .pressBack(new ExitFormDialog("All widgets", rule))
-                .assertText(R.string.do_not_save)
-                .assertTextDoesNotExist(R.string.keep_changes)
-                .clickOnString(R.string.do_not_save);
+                .pressBack(new SaveOrDiscardFormDialog<>(new MainMenuPage(), false))
+                .assertText(org.odk.collect.strings.R.string.do_not_save)
+                .assertTextDoesNotExist(org.odk.collect.strings.R.string.keep_changes)
+                .clickOnString(org.odk.collect.strings.R.string.do_not_save);
     }
 }

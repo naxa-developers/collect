@@ -1,49 +1,35 @@
 package org.odk.collect.android.feature.formentry;
 
-import android.Manifest;
-
-import androidx.test.espresso.intent.rule.IntentsTestRule;
-import androidx.test.rule.GrantPermissionRule;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.odk.collect.android.R;
-import org.odk.collect.android.activities.FormEntryActivity;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
-import org.odk.collect.android.support.pages.FormEntryPage;
-import org.odk.collect.android.support.FormLoadingUtils;
+import org.odk.collect.android.support.rules.BlankFormTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
 
 public class ContextMenuTest {
     private static final String STRING_WIDGETS_TEST_FORM = "string_widgets_in_field_list.xml";
 
-    @Rule
-    public IntentsTestRule<FormEntryActivity> activityTestRule = FormLoadingUtils.getFormActivityTestRuleFor(STRING_WIDGETS_TEST_FORM);
+    public BlankFormTestRule activityTestRule = new BlankFormTestRule(STRING_WIDGETS_TEST_FORM, "fl");
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            )
-            .around(new ResetStateRule())
-            .around(new CopyFormRule(STRING_WIDGETS_TEST_FORM, true));
+    public RuleChain copyFormChain = TestRuleChain.chain()
+            .around(activityTestRule);
 
     @Test
     public void whenRemoveStringAnswer_ShouldAppropriateQuestionBeCleared() {
-        new FormEntryPage("string_widgets", activityTestRule)
-                .putTextOnIndex(0, "TestString")
-                .putTextOnIndex(1, "1234")
+        activityTestRule.startInFormEntry()
+                .answerQuestion(0, "TestString")
+                .answerQuestion(1, "1234")
                 .assertText("TestString")
                 .assertText("1234")
-                .longPressOnView("Question1")
+                .longPressOnQuestion("Question1")
                 .removeResponse()
                 .assertTextDoesNotExist("TestString")
                 .assertText("1234")
-                .putTextOnIndex(0, "TestString")
+                .answerQuestion(0, "TestString")
                 .assertText("TestString")
-                .longPressOnView("Question2")
+                .longPressOnQuestion("Question2")
                 .removeResponse()
                 .assertTextDoesNotExist("1234")
                 .assertText("TestString");
@@ -51,8 +37,9 @@ public class ContextMenuTest {
 
     @Test
     public void whenLongPressedOnEditText_ShouldNotRemoveAnswerOptionAppear() {
-        new FormEntryPage("string_widgets", activityTestRule)
-                .longPressOnView(R.id.answer_container, 0)
-                .assertTextDoesNotExist(R.string.clear_answer);
+        activityTestRule.startInFormEntry()
+                .assertOnPage()
+                .longPressOnQuestion(R.id.answer_container, 0)
+                .assertTextDoesNotExist(org.odk.collect.strings.R.string.clear_answer);
     }
 }

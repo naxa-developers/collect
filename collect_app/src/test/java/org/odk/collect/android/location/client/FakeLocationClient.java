@@ -2,16 +2,16 @@ package org.odk.collect.android.location.client;
 
 import android.location.Location;
 
+import androidx.annotation.Nullable;
+
 import com.google.android.gms.location.LocationListener;
 
-import java.lang.ref.WeakReference;
-
-import androidx.annotation.Nullable;
+import org.odk.collect.location.LocationClient;
 
 public class FakeLocationClient implements LocationClient {
     private boolean failOnStart;
     private boolean failOnRequest;
-    private WeakReference<LocationClientListener> listenerRef;
+    private LocationClientListener listener;
     private LocationListener locationListener;
     private boolean running;
     private boolean locationAvailable = true;
@@ -45,7 +45,8 @@ public class FakeLocationClient implements LocationClient {
 
     // Implementation of the LocationClient interface.
 
-    public void start() {
+    public void start(LocationClientListener listener) {
+        setListener(listener);
         running = true;
         if (getListener() != null) {
             if (failOnStart) {
@@ -62,6 +63,7 @@ public class FakeLocationClient implements LocationClient {
         if (getListener() != null) {
             getListener().onClientStop();
         }
+        setListener(null);
     }
 
     public boolean isLocationAvailable() {
@@ -82,11 +84,11 @@ public class FakeLocationClient implements LocationClient {
 
     @Override
     public void setListener(@Nullable LocationClientListener locationClientListener) {
-        this.listenerRef = new WeakReference<>(locationClientListener);
+        this.listener = locationClientListener;
     }
 
     protected LocationClientListener getListener() {
-        return listenerRef != null ? listenerRef.get() : null;
+        return listener;
     }
 
     public Location getLastLocation() {
@@ -103,6 +105,11 @@ public class FakeLocationClient implements LocationClient {
 
     public void setPriority(Priority priority) {
         this.priority = priority;
+    }
+
+    @Override
+    public void setRetainMockAccuracy(boolean retainMockAccuracy) {
+        throw new UnsupportedOperationException();
     }
 
     public boolean canSetUpdateIntervals() {

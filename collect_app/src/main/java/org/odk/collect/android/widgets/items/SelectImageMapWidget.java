@@ -19,9 +19,7 @@ package org.odk.collect.android.widgets.items;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
-import android.text.Html;
 import android.util.TypedValue;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
@@ -32,10 +30,11 @@ import org.javarosa.core.model.SelectChoice;
 import org.javarosa.core.model.data.helper.Selection;
 import org.javarosa.core.reference.InvalidReferenceException;
 import org.javarosa.form.api.FormEntryPrompt;
-import org.odk.collect.android.R;
 import org.odk.collect.android.databinding.SelectImageMapWidgetAnswerBinding;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.utilities.StringUtils;
+import org.odk.collect.android.utilities.HtmlUtils;
+import org.odk.collect.android.widgets.QuestionWidget;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -61,7 +60,7 @@ import timber.log.Timber;
  * A base widget class which is responsible for sharing the code used by image map select widgets like
  * {@link SelectOneImageMapWidget} and {@link SelectMultiImageMapWidget}.
  */
-public abstract class SelectImageMapWidget extends ItemsWidget {
+public abstract class SelectImageMapWidget extends QuestionWidget {
     private static final String WEB_VIEW_CONTENT =
             "<!DOCTYPE html> <html>\n" +
                     "    <body>\n" +
@@ -74,8 +73,13 @@ public abstract class SelectImageMapWidget extends ItemsWidget {
     private String imageMapFilePath;
     SelectImageMapWidgetAnswerBinding binding;
 
-    public SelectImageMapWidget(Context context, QuestionDetails prompt) {
+    final List<SelectChoice> items;
+
+    public SelectImageMapWidget(Context context, QuestionDetails prompt, SelectChoiceLoader selectChoiceLoader) {
         super(context, prompt);
+        render();
+
+        items = ItemsWidgetUtils.loadItemsAndHandleErrors(this, questionDetails.getPrompt(), selectChoiceLoader);
 
         isSingleSelect = this instanceof SelectOneImageMapWidget;
 
@@ -107,11 +111,12 @@ public abstract class SelectImageMapWidget extends ItemsWidget {
     public void clearAnswer() {
         selections.clear();
         binding.imageMap.loadUrl("javascript:clearAreas()");
+        binding.selectedElements.setVisibility(GONE);
         widgetValueChanged();
     }
 
     @Override
-    public boolean suppressFlingGesture(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+    public boolean shouldSuppressFlingGesture() {
         return binding.imageMap.suppressFlingGesture();
     }
 
@@ -119,12 +124,16 @@ public abstract class SelectImageMapWidget extends ItemsWidget {
     protected View onCreateAnswerView(Context context, FormEntryPrompt prompt, int answerFontSize) {
         binding = SelectImageMapWidgetAnswerBinding.inflate(((Activity) context).getLayoutInflater());
         binding.selectedElements.setTextSize(TypedValue.COMPLEX_UNIT_DIP, answerFontSize);
+        binding.selectedElements.setVisibility(binding.selectedElements.getText().toString().isBlank() ? GONE : VISIBLE);
         return binding.getRoot();
     }
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     private void setUpWebView() {
-        String svgMap = getParsedSVGFile();
+        String svgMap = null;
+        if (imageMapFilePath != null && !imageMapFilePath.isEmpty()) {
+            svgMap = getParsedSVGFile();
+        }
         if (svgMap != null) {
             binding.imageMap.getSettings().setJavaScriptEnabled(true);
             binding.imageMap.getSettings().setBuiltInZoomControls(true);
@@ -159,7 +168,7 @@ public abstract class SelectImageMapWidget extends ItemsWidget {
         if (selectChoice != null) {
             selections.add(new Selection(selectChoice));
         }
-        widgetValueChanged();
+        ((Activity) getContext()).runOnUiThread(this::widgetValueChanged);
     }
 
     private void unselectArea(String areaId) {
@@ -172,7 +181,7 @@ public abstract class SelectImageMapWidget extends ItemsWidget {
         }
 
         selections.remove(selectionToRemove);
-        widgetValueChanged();
+        ((Activity) getContext()).runOnUiThread(this::widgetValueChanged);
     }
 
     private void notifyChanges() {
@@ -210,7 +219,7 @@ public abstract class SelectImageMapWidget extends ItemsWidget {
             return convertDocumentToString(document);
         } catch (Exception e) {
             Timber.w(e);
-            return getContext().getString(R.string.svg_file_does_not_exist);
+            return getContext().getString(org.odk.collect.strings.R.string.svg_file_does_not_exist);
         }
     }
 
@@ -248,20 +257,21 @@ public abstract class SelectImageMapWidget extends ItemsWidget {
         if (!selections.isEmpty()) {
             stringBuilder
                     .append("<b>")
-                    .append(getContext().getString(R.string.selected))
+                    .append(getContext().getString(org.odk.collect.strings.R.string.selected))
                     .append("</b> ");
             for (Selection selection : selections) {
-                String choiceName = getFormEntryPrompt().getSelectChoiceText(selection.choice);
-                CharSequence choiceDisplayName = StringUtils.textToHtml(choiceName);
-                stringBuilder.append(choiceDisplayName);
+                String answer = getFormEntryPrompt().getSelectChoiceText(selection.choice);
+                stringBuilder.append(answer);
                 if (selections.indexOf(selection) < selections.size() - 1) {
                     stringBuilder.append(", ");
                 }
             }
         }
 
-        ((Activity) getContext()).runOnUiThread(() ->
-                binding.selectedElements.setText(Html.fromHtml(stringBuilder.toString())));
+        ((Activity) getContext()).runOnUiThread(() -> {
+            binding.selectedElements.setText(HtmlUtils.textToHtml(stringBuilder.toString()));
+            binding.selectedElements.setVisibility(binding.selectedElements.getText().toString().isBlank() ? GONE : VISIBLE);
+        });
     }
 
     protected abstract void highlightSelections(WebView view);

@@ -2,6 +2,8 @@ package org.odk.collect.android.widgets;
 
 import android.view.View;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
 import org.javarosa.core.model.QuestionDef;
 import org.javarosa.core.model.data.TimeData;
 import org.javarosa.form.api.FormEntryPrompt;
@@ -9,13 +11,12 @@ import org.joda.time.LocalDateTime;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.R;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.listeners.WidgetValueChangedListener;
-import org.odk.collect.android.support.TestScreenContextActivity;
+import org.odk.collect.android.support.WidgetTestActivity;
 import org.odk.collect.android.utilities.DateTimeUtils;
+import org.odk.collect.android.widgets.support.FakeWaitingForDataRegistry;
 import org.odk.collect.android.widgets.utilities.DateTimeWidgetUtils;
-import org.robolectric.RobolectricTestRunner;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
@@ -27,9 +28,9 @@ import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.prom
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.promptWithReadOnlyAndQuestionDef;
 import static org.odk.collect.android.widgets.support.QuestionWidgetHelpers.widgetTestActivity;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class TimeWidgetTest {
-    private TestScreenContextActivity widgetActivity;
+    private WidgetTestActivity widgetActivity;
     private DateTimeWidgetUtils widgetUtils;
     private View.OnLongClickListener onLongClickListener;
 
@@ -56,7 +57,7 @@ public class TimeWidgetTest {
     @Test
     public void whenPromptIsNotReadOnly_buttonShowsCorrectText() {
         TimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
-        assertEquals(widget.binding.timeButton.getText(), widget.getContext().getString(R.string.select_time));
+        assertEquals(widget.binding.timeButton.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.select_time));
     }
 
     @Test
@@ -73,7 +74,7 @@ public class TimeWidgetTest {
     @Test
     public void whenPromptDoesNotHaveAnswer_answerTextViewShowsNoTimeSelected() {
         TimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
-        assertEquals(widget.binding.timeAnswerText.getText(), widget.getContext().getString(R.string.no_time_selected));
+        assertEquals(widget.binding.timeAnswerText.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.no_time_selected));
     }
 
     @Test
@@ -104,7 +105,7 @@ public class TimeWidgetTest {
     public void clearAnswer_clearsWidgetAnswer() {
         TimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, new TimeData(timeAnswer.toDateTime().toDate())));
         widget.clearAnswer();
-        assertEquals(widget.binding.timeAnswerText.getText(), widget.getContext().getString(R.string.no_time_selected));
+        assertEquals(widget.binding.timeAnswerText.getText(), widget.getContext().getString(org.odk.collect.strings.R.string.no_time_selected));
     }
 
     @Test
@@ -141,7 +142,17 @@ public class TimeWidgetTest {
         assertEquals(widget.binding.timeAnswerText.getText(), DateTimeUtils.getTimeData(timeAnswer.toDateTime()).getDisplayText());
     }
 
+    @Test
+    public void setData_callsValueChangeListener() {
+        TimeWidget widget = createWidget(promptWithQuestionDefAndAnswer(questionDef, null));
+        WidgetValueChangedListener valueChangedListener = mockValueChangedListener(widget);
+        widget.setValueChangedListener(valueChangedListener);
+        widget.setData(timeAnswer.toDateTime());
+
+        verify(valueChangedListener).widgetValueChanged(widget);
+    }
+
     private TimeWidget createWidget(FormEntryPrompt prompt) {
-        return new TimeWidget(widgetActivity, new QuestionDetails(prompt, "formAnalyticsID"), widgetUtils);
+        return new TimeWidget(widgetActivity, new QuestionDetails(prompt), widgetUtils, new FakeWaitingForDataRegistry());
     }
 }

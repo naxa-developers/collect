@@ -1,20 +1,17 @@
 package org.odk.collect.android.regression;
 
-import android.Manifest;
-
-import androidx.test.rule.GrantPermissionRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.support.CollectTestRule;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
+import org.odk.collect.android.support.pages.AddNewRepeatDialog;
+import org.odk.collect.android.support.rules.CollectTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
+import org.odk.collect.android.support.pages.FormEndPage;
 import org.odk.collect.android.support.pages.FormEntryPage;
-import org.odk.collect.android.support.pages.GeneralSettingsPage;
-import org.odk.collect.android.support.pages.MainMenuPage;
+import org.odk.collect.android.support.pages.ProjectSettingsPage;
 
 //Issue NODK-247
 @RunWith(AndroidJUnit4.class)
@@ -23,283 +20,279 @@ public class FillBlankFormWithRepeatGroupTest {
     public CollectTestRule rule = new CollectTestRule();
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_PHONE_STATE)
-            )
-            .around(new ResetStateRule())
-            .around(new CopyFormRule("TestRepeat.xml"))
-            .around(new CopyFormRule("form1.xml"))
-            .around(new CopyFormRule("form2.xml"))
-            .around(new CopyFormRule("form3.xml"))
-            .around(new CopyFormRule("form4.xml"))
-            .around(new CopyFormRule("form5.xml"))
-            .around(new CopyFormRule("form6.xml"))
-            .around(new CopyFormRule("form7.xml"))
-            .around(new CopyFormRule("form8.xml"))
-            .around(new CopyFormRule("form9.xml"))
-            .around(new CopyFormRule("RepeatGroupAndGroup.xml"))
-            .around(new CopyFormRule("basic.xml"))
-            .around(new CopyFormRule("repeat_group_form.xml"))
-            .around(new CopyFormRule("repeat_group_new.xml"))
-            .around(new CopyFormRule("RepeatTitles_1648.xml"))
+    public RuleChain copyFormChain = TestRuleChain.chain()
             .around(rule);
 
     @Test
     public void whenNoRepeatGroupAdded_ShouldNotDoubleLastQuestion() {
 
         //TestCase1
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("TestRepeat.xml")
                 .startBlankForm("TestRepeat")
                 .clickOptionsIcon()
                 .clickGeneralSettings()
                 .clickOnUserInterface()
                 .clickNavigation()
                 .clickUseSwipesAndButtons()
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new FormEntryPage("TestRepeat", rule))
-                .clickForwardButton()
-                .clickOnDoNotAddGroup()
-                .clickOnDoNotAddGroup()
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new FormEntryPage("TestRepeat"))
+                .swipeToNextQuestionWithRepeatGroup("Repeat # 1")
+                .clickOnDoNotAdd(new AddNewRepeatDialog("Repeat # 2"))
+                .clickOnDoNotAdd(new FormEntryPage("TestRepeat"))
                 .clickForwardButtonToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
     @Test
     public void dynamicGroupLabel_should_beCalculatedProperly() {
 
         //TestCase3
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("RepeatTitles_1648.xml")
                 .startBlankForm("Repeat titles 1648")
                 .inputText("test")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Name")
                 .inputText("FirstPerson")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Age")
                 .inputText("25")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Photo")
                 .assertText("gr1 > 1 > Person: 25")
                 .clickGoToArrow()
                 .assertText("gr1 > 1 > Person: 25")
                 .clickOnQuestion("Photo")
-                .swipeToNextQuestion()
-                .clickOnDoNotAddGroup()
+                .swipeToNextQuestionWithRepeatGroup("gr1")
+                .clickOnDoNotAdd(new FormEntryPage("Repeat titles 1648"))
                 .inputText("SecondPart")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Date")
                 .assertText("Part1 > 1 > Xxx: SecondPart")
                 .clickGoToArrow()
                 .assertText("Part1 > 1 > Xxx: SecondPart")
                 .clickOnQuestion("Date")
-                .swipeToNextQuestion()
-                .swipeToNextQuestion()
-                .clickOnDoNotAddGroupEndingForm()
-                .clickSaveAndExit();
+                .swipeToNextQuestion("Multi Select")
+                .swipeToNextQuestionWithRepeatGroup("Part1")
+                .clickOnDoNotAdd(new FormEndPage("Repeat titles 1648"))
+                .clickFinalize();
     }
 
     @Test
     public void nestedGroupsWithFieldListAppearance_ShouldBeAbleToFillTheForm() {
 
         //TestCase5
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form1.xml")
                 .startBlankForm("form1")
-                .swipeToNextQuestion()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
 
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form2.xml")
                 .startBlankForm("form2")
                 .closeSoftKeyboard()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
 
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form3.xml")
                 .startBlankForm("form3")
                 .closeSoftKeyboard()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
 
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form4.xml")
                 .startBlankForm("form4")
                 .inputText("T1")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("T2")
                 .inputText("T2")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("T3")
                 .inputText("T3")
                 .closeSoftKeyboard()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
 
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form5.xml")
                 .startBlankForm("form5")
                 .inputText("T1")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("T2")
                 .inputText("T2")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("T3")
                 .inputText("T3")
                 .closeSoftKeyboard()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
 
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form6.xml")
                 .startBlankForm("form6")
                 .inputText("T1")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("T2")
                 .inputText("T2")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("T3")
                 .inputText("T3")
                 .closeSoftKeyboard()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
 
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form7.xml")
                 .startBlankForm("form7")
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
 
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form8.xml")
                 .startBlankForm("form8")
                 .closeSoftKeyboard()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
 
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("form9.xml")
                 .startBlankForm("form9")
                 .closeSoftKeyboard()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
     @Test
     public void whenNoRepeatGroupAdded_ShouldBackwardButtonBeClickable() {
 
         //TestCase6
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+        rule.startAtMainMenu()
+                .copyForm("RepeatGroupAndGroup.xml")
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .clickOnUserInterface()
                 .clickNavigation()
                 .clickUseSwipesAndButtons()
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(rule.startAtMainMenu())
                 .startBlankFormWithRepeatGroup("RepeatGroupAndGroup", "G1")
-                .clickOnDoNotAdd(new FormEntryPage("RepeatGroupAndGroup", rule))
+                .clickOnDoNotAdd(new FormEntryPage("RepeatGroupAndGroup"))
                 .closeSoftKeyboard()
-                .clickBackwardButton()
-                .clickOnDoNotAddGroup()
+                .swipeToPreviousQuestionWithRepeatGroup("G1")
+                .clickOnDoNotAdd(new FormEntryPage("RepeatGroupAndGroup"))
                 .closeSoftKeyboard()
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
     @Test
     public void when_pageBehindRepeatGroupWithRegularGroupInsideIsVisible_should_swipeBackWork() {
 
         //TestCase7
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("repeat_group_new.xml")
                 .startBlankFormWithRepeatGroup("RepeatGroupNew", "People")
-                .clickOnAdd(new FormEntryPage("RepeatGroupNew", rule))
+                .clickOnAdd(new FormEntryPage("RepeatGroupNew"))
                 .inputText("A")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Age")
                 .inputText("1")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
-                .clickOnAddGroup()
+                .swipeToNextQuestionWithRepeatGroup("People")
+                .clickOnAdd(new FormEntryPage("RepeatGroupNew"))
+                .assertQuestion("Name")
                 .inputText("B")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Age")
                 .inputText("2")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
-                .clickOnAddGroup()
+                .swipeToNextQuestionWithRepeatGroup("People")
+                .clickOnAdd(new FormEntryPage("RepeatGroupNew"))
+                .assertQuestion("Name")
                 .inputText("C")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Age")
                 .inputText("3")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
-                .clickOnDoNotAddGroup()
-                .swipeToPreviousQuestion()
+                .swipeToNextQuestionWithRepeatGroup("People")
+                .clickOnDoNotAdd(new FormEndPage("RepeatGroupNew"))
+                .swipeToPreviousQuestion("Age")
                 .assertText("3")
-                .swipeToNextQuestion()
-                .clickOnDoNotAddGroupEndingForm()
-                .clickSaveAndExit();
+                .swipeToNextQuestionWithRepeatGroup("People")
+                .clickOnDoNotAdd(new FormEndPage("RepeatGroupNew"))
+                .clickFinalize();
     }
 
     @Test
     public void when_navigateOnHierarchyView_should_breadcrumbPathBeVisible() {
 
         //TestCase8
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("repeat_group_new.xml")
                 .startBlankFormWithRepeatGroup("RepeatGroupNew", "People")
-                .clickOnAdd(new FormEntryPage("RepeatGroupNew", rule))
+                .clickOnAdd(new FormEntryPage("RepeatGroupNew"))
                 .inputText("A")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Age")
                 .inputText("1")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
-                .clickOnAddGroup()
+                .swipeToNextQuestionWithRepeatGroup("People")
+                .clickOnAdd(new FormEntryPage("RepeatGroupNew"))
                 .inputText("B")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Age")
                 .inputText("2")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
-                .clickOnAddGroup()
+                .swipeToNextQuestionWithRepeatGroup("People")
+                .clickOnAdd(new FormEntryPage("RepeatGroupNew"))
                 .inputText("C")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("Age")
                 .inputText("3")
                 .clickGoToArrow()
                 .assertText("People > 3 > Person: C")
                 .clickGoUpIcon()
                 .assertText("3.\u200E Person: C")
                 .clickJumpEndButton()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
     @Test
     public void firstQuestionWithLongLabel_ShouldDisplayBothAnswersInHierarchyPage() {
 
         //TestCase11
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("basic.xml")
                 .startBlankForm("basic")
                 .inputText("1")
                 .closeSoftKeyboard()
-                .swipeToNextQuestion()
+                .swipeToNextQuestion("what is your age")
                 .inputText("2")
                 .closeSoftKeyboard()
                 .clickGoToArrow()
                 .assertText("2")
                 .clickJumpEndButton()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
     @Test
     public void openHierarchyPageFromLastView_ShouldNotDisplayError() {
 
         //TestCase12
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("repeat_group_form.xml")
                 .startBlankFormWithRepeatGroup("Repeat Group", "Grp1")
-                .clickOnAdd(new FormEntryPage("Repeat Group", rule))
-                .swipeToNextQuestion()
-                .clickOnDoNotAddGroup()
-                .swipeToNextQuestion()
-                .clickOnDoNotAddGroup()
+                .clickOnAdd(new FormEntryPage("Repeat Group"))
+                .swipeToNextQuestionWithRepeatGroup("Grp1")
+                .clickOnDoNotAdd(new FormEntryPage("Repeat Group"))
+                .swipeToNextQuestionWithRepeatGroup("Grp2")
+                .clickOnDoNotAdd(new FormEndPage("Repeat Group"))
                 .clickGoToArrow()
                 .clickJumpEndButton()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 }

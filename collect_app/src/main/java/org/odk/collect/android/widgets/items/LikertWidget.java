@@ -1,5 +1,10 @@
 package org.odk.collect.android.widgets.items;
 
+import static android.widget.RelativeLayout.CENTER_HORIZONTAL;
+import static android.widget.RelativeLayout.CENTER_IN_PARENT;
+import static android.widget.RelativeLayout.TRUE;
+import static org.odk.collect.android.utilities.ViewUtils.pxFromDp;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -7,14 +12,15 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-import androidx.appcompat.widget.AppCompatRadioButton;
+import androidx.annotation.NonNull;
+
+import com.google.android.material.radiobutton.MaterialRadioButton;
 
 import org.javarosa.core.model.SelectChoice;
 import org.javarosa.core.model.data.IAnswerData;
@@ -23,24 +29,22 @@ import org.javarosa.core.model.data.helper.Selection;
 import org.javarosa.core.reference.InvalidReferenceException;
 import org.javarosa.core.reference.ReferenceManager;
 import org.javarosa.form.api.FormEntryCaption;
-import org.odk.collect.android.R;
-import org.odk.collect.android.external.ExternalSelectChoice;
+import org.javarosa.form.api.FormEntryPrompt;
+import org.odk.collect.android.dynamicpreload.ExternalSelectChoice;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.utilities.FileUtils;
+import org.odk.collect.android.utilities.HtmlUtils;
+import org.odk.collect.android.widgets.QuestionWidget;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
+import org.odk.collect.androidshared.bitmap.ImageFileUtils;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 
 import timber.log.Timber;
 
-import static android.widget.RelativeLayout.CENTER_HORIZONTAL;
-import static android.widget.RelativeLayout.CENTER_IN_PARENT;
-import static android.widget.RelativeLayout.TRUE;
-import static org.odk.collect.android.utilities.ViewUtils.dpFromPx;
-
 @SuppressLint("ViewConstructor")
-public class LikertWidget extends ItemsWidget {
-
+public class LikertWidget extends QuestionWidget {
     LinearLayout view;
     private RadioButton checkedButton;
     private final LinearLayout.LayoutParams linearLayoutParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1);
@@ -48,20 +52,24 @@ public class LikertWidget extends ItemsWidget {
     private final RelativeLayout.LayoutParams imageViewParams = new RelativeLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
     private final RelativeLayout.LayoutParams radioButtonsParams = new RelativeLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
     private final RelativeLayout.LayoutParams buttonViewParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-    private final RelativeLayout.LayoutParams leftLineViewParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 2);
-    private final RelativeLayout.LayoutParams rightLineViewParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 2);
+    private final List<SelectChoice> items;
 
     HashMap<RadioButton, String> buttonsToName;
 
-    public LikertWidget(Context context, QuestionDetails questionDetails) {
+    public LikertWidget(Context context, QuestionDetails questionDetails, SelectChoiceLoader selectChoiceLoader) {
         super(context, questionDetails);
+        items = ItemsWidgetUtils.loadItemsAndHandleErrors(this, questionDetails.getPrompt(), selectChoiceLoader);
 
         setMainViewLayoutParameters();
         setStructures();
-
         setButtonListener();
         setSavedButton();
-        addAnswerView(view, dpFromPx(context, 10));
+        render();
+    }
+
+    @Override
+    protected View onCreateAnswerView(@NonNull Context context, @NonNull FormEntryPrompt prompt, int answerFontSize) {
+        return view;
     }
 
     public void setMainViewLayoutParameters() {
@@ -77,7 +85,7 @@ public class LikertWidget extends ItemsWidget {
         if (getFormEntryPrompt().getAnswerValue() != null) {
             String name = ((Selection) getFormEntryPrompt().getAnswerValue()
                     .getValue()).getValue();
-            for (RadioButton bu: buttonsToName.keySet()) {
+            for (RadioButton bu : buttonsToName.keySet()) {
                 if (buttonsToName.get(bu).equals(name)) {
                     checkedButton = bu;
                     checkedButton.setChecked(true);
@@ -116,14 +124,6 @@ public class LikertWidget extends ItemsWidget {
             buttonsToName.put(button, items.get(i).getValue());
             buttonView.addView(button);
 
-            if (i == 0) {
-                addLine(true, false, button, buttonView);
-            } else if (i == items.size() - 1) {
-                addLine(false, true, button, buttonView);
-            } else {
-                addLine(false, false, button, buttonView);
-            }
-
             LinearLayout optionView = getLinearLayout();
             optionView.addView(buttonView);
 
@@ -133,7 +133,7 @@ public class LikertWidget extends ItemsWidget {
                 optionView.addView(imgView);
             }
             TextView choice = getTextView();
-            choice.setText(getFormEntryPrompt().getSelectChoiceText(items.get(i)));
+            choice.setText(HtmlUtils.textToHtml(getFormEntryPrompt().getSelectChoiceText(items.get(i))));
 
             optionView.addView(choice);
 
@@ -155,41 +155,6 @@ public class LikertWidget extends ItemsWidget {
         }
     }
 
-    // Adds lines to the button's side
-    public void addLine(boolean left, boolean right, RadioButton button, RelativeLayout buttonView) {
-        // left line
-        View leftLineView = new View(this.getContext());
-        leftLineViewParams.addRule(RelativeLayout.LEFT_OF, button.getId());
-        leftLineViewParams.addRule(CENTER_IN_PARENT, TRUE);
-        leftLineView.setLayoutParams(leftLineViewParams);
-        leftLineView.setBackgroundColor(getResources().getColor(R.color.gray600));
-
-        // right line
-        View rightLineView = new View(this.getContext());
-        rightLineViewParams.addRule(RelativeLayout.RIGHT_OF, button.getId());
-        rightLineViewParams.addRule(CENTER_IN_PARENT, TRUE);
-        rightLineView.setLayoutParams(rightLineViewParams);
-        rightLineView.setBackgroundColor(getResources().getColor(R.color.gray600));
-
-        if (left) {
-            if (isRTL()) {
-                rightLineView.setVisibility(View.INVISIBLE);
-            } else {
-                leftLineView.setVisibility(View.INVISIBLE);
-            }
-        }
-        buttonView.addView(leftLineView);
-        if (right) {
-            if (isRTL()) {
-                leftLineView.setVisibility(View.INVISIBLE);
-            } else {
-                rightLineView.setVisibility(View.INVISIBLE);
-            }
-        }
-
-        buttonView.addView(rightLineView);
-    }
-
     // Creates image view for choice
     public ImageView getImageView() {
         ImageView view = new ImageView(getContext());
@@ -198,28 +163,20 @@ public class LikertWidget extends ItemsWidget {
     }
 
     public RadioButton getRadioButton(int i) {
-        AppCompatRadioButton button = new AppCompatRadioButton(getContext());
+        MaterialRadioButton button = new MaterialRadioButton(getContext());
         button.setId(View.generateViewId());
         button.setEnabled(!getFormEntryPrompt().isReadOnly());
         button.setFocusable(!getFormEntryPrompt().isReadOnly());
         radioButtonsParams.addRule(CENTER_HORIZONTAL, TRUE);
+        radioButtonsParams.setMargins(0, pxFromDp(getContext(), 16), 0, pxFromDp(getContext(), 8));
         button.setLayoutParams(radioButtonsParams);
-        // This the adds the negated margins to reduce the extra padding of the button.
-        // It is done this way to get the width of the button which has to be done after rendering
-        ViewTreeObserver vto = button.getViewTreeObserver();
-        // This variable is to prevent an infinite loop for rendering the button.
-        final Boolean[] paramsSet = {false};
-        vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override
-            public void onGlobalLayout() {
-                if (!paramsSet[0]) {
-                    int width = button.getWidth();
-                    radioButtonsParams.setMargins(-width / 5, 0, -width / 5, 0);
-                    button.setLayoutParams(radioButtonsParams);
-                    paramsSet[0] = true;
-                }
-            }
-        });
+
+        // Remove radio button padding - this needs minHeight/Width rather than padding
+        button.setMinHeight(0);
+        button.setMinWidth(0);
+        button.setMinimumHeight(0);
+        button.setMinimumWidth(0);
+
         button.setGravity(Gravity.CENTER);
         return button;
     }
@@ -244,7 +201,7 @@ public class LikertWidget extends ItemsWidget {
     }
 
     public void setButtonListener() {
-        for (RadioButton button: buttonsToName.keySet()) {
+        for (RadioButton button : buttonsToName.keySet()) {
             button.setOnClickListener(new OnClickListener() {
 
                 @Override
@@ -293,7 +250,7 @@ public class LikertWidget extends ItemsWidget {
                     DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
                     int screenWidth = metrics.widthPixels;
                     int screenHeight = metrics.heightPixels;
-                    b = FileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
+                    b = ImageFileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
                 } catch (OutOfMemoryError e) {
                     errorMsg = "ERROR: " + e.getMessage();
                 }
@@ -303,14 +260,14 @@ public class LikertWidget extends ItemsWidget {
                     imageView.setImageBitmap(b);
                 } else if (errorMsg == null) {
                     // Loading the image failed. The image work when in .jpg format
-                    errorMsg = getContext().getString(R.string.file_invalid, imageFile);
+                    errorMsg = getContext().getString(org.odk.collect.strings.R.string.file_invalid, imageFile);
 
                 }
             } else {
-                errorMsg = getContext().getString(R.string.file_missing, imageFile);
+                errorMsg = getContext().getString(org.odk.collect.strings.R.string.file_missing, imageFile);
             }
             if (errorMsg != null) {
-                Timber.e(errorMsg);
+                Timber.e(new Error(errorMsg));
             }
         } catch (InvalidReferenceException e) {
             Timber.d(e, "Invalid image reference due to %s ", e.getMessage());

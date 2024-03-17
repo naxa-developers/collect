@@ -17,10 +17,6 @@ limitations under the License.
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingTop="@dimen/margin_large"
-    android:paddingBottom="@dimen/margin_large"
-    android:paddingStart="@dimen/margin_standard"
-    android:paddingEnd="@dimen/margin_standard"
     android:clipChildren="false"
     android:clipToPadding="false">
 
@@ -29,7 +25,7 @@ limitations under the License.
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:textSize="25sp" />
+        android:textAppearance="?textAppearanceHeadline5" />
 
     <FrameLayout
         android:layout_width="match_parent"

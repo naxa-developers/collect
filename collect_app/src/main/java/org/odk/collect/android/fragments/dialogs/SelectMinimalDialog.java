@@ -27,6 +27,7 @@ import javax.inject.Inject;
 import static org.odk.collect.android.injection.DaggerUtils.getComponent;
 
 public abstract class SelectMinimalDialog extends MaterialFullScreenDialogFragment {
+
     private SelectMinimalDialogLayoutBinding binding;
 
     private boolean isFlex;
@@ -120,7 +121,7 @@ public abstract class SelectMinimalDialog extends MaterialFullScreenDialogFragme
         getToolbar().inflateMenu(R.menu.select_minimal_dialog_menu);
 
         SearchView searchView = (SearchView) getToolbar().getMenu().findItem(R.id.menu_filter).getActionView();
-        searchView.setQueryHint(getResources().getString(R.string.search));
+        searchView.setQueryHint(getResources().getString(org.odk.collect.strings.R.string.search));
         searchView.setMaxWidth(Integer.MAX_VALUE);
         searchView.onActionViewExpanded();
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {

@@ -1,11 +1,14 @@
 package org.odk.collect.android.openrosa;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import org.odk.collect.android.TestSettingsProvider;
 import org.odk.collect.android.utilities.DocumentFetchResult;
 import org.odk.collect.android.utilities.WebCredentialsUtils;
-import org.robolectric.RobolectricTestRunner;
 
 import java.io.ByteArrayInputStream;
 import java.util.HashMap;
@@ -17,7 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class OpenRosaXmlFetcherTest {
 
     private OpenRosaHttpInterface httpInterface;
@@ -26,7 +29,7 @@ public class OpenRosaXmlFetcherTest {
     @Before
     public void setup() {
         httpInterface = mock(OpenRosaHttpInterface.class);
-        openRosaXMLFetcher = new OpenRosaXmlFetcher(httpInterface, new WebCredentialsUtils());
+        openRosaXMLFetcher = new OpenRosaXmlFetcher(httpInterface, new WebCredentialsUtils(TestSettingsProvider.getUnprotectedSettings()));
     }
 
     @Test
@@ -53,15 +56,6 @@ public class OpenRosaXmlFetcherTest {
         DocumentFetchResult result = openRosaXMLFetcher.getXML("http://testurl");
         assertThat(result.responseCode, equalTo(500));
         assertThat(result.errorMessage, equalTo("getXML failed while accessing http://testurl with status code: 500"));
-    }
-
-    @Test
-    public void getXML_whenHttpInterfaceThrowsAnException_returnsResultWith0StatusAndErrorMessage() throws Exception {
-        when(httpInterface.executeGetRequest(any(), any(), any())).thenThrow(new Exception());
-
-        DocumentFetchResult result = openRosaXMLFetcher.getXML("http://testurl");
-        assertThat(result.responseCode, equalTo(0));
-        assertThat(result.errorMessage, equalTo("Parsing failed with null while accessing http://testurl"));
     }
 }
 

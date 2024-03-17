@@ -7,22 +7,15 @@ OR CONDITIONS OF ANY KIND, either express or implied. See the License for
 the specific language governing permissions and limitations under the License. -->
 <resources>
     <string-array name="theme_entries">
+        <item>@string/theme_system</item>
         <item>@string/theme_light</item>
         <item>@string/theme_dark</item>
     </string-array>
     <!-- DO NOT translate theme_entry_values - only used internally -->
     <string-array name="theme_entry_values" translatable="false">
+        <item>@string/app_theme_system</item>
         <item>@string/app_theme_light</item>
         <item>@string/app_theme_dark</item>
-    </string-array>
-    <!-- DO NOT translate protocol_entry_values - only used internally -->
-    <string-array name="protocol_entry_values">
-        <item>@string/protocol_odk_default</item>
-        <item>@string/protocol_google_sheets</item>
-    </string-array>
-    <string-array name="protocol_entries">
-        <item>@string/server_platform_odk</item>
-        <item>@string/server_platform_google_sheets</item>
     </string-array>
 
     <!-- DO NOT alter font_size_entry_values - used internally in preferences activity -->
@@ -177,5 +170,23 @@ the specific language governing permissions and limitations under the License. -
         <item>@string/form_update_mode_manual</item>
         <item>@string/form_update_mode_previously_downloaded</item>
         <item>@string/form_update_mode_match_exactly</item>
+    </string-array>
+    
+    <string-array name="project_colors">
+        <item>#EA4633</item>
+        <item>#E9527E</item>
+        <item>#9F50B0</item>
+        <item>#3F51B5</item>
+        <item>#2296F3</item>
+        <item>#53BDD4</item>
+        <item>#489789</item>
+        <item>#5DAF50</item>
+        <item>#8BC34A</item>
+        <item>#CDDC39</item>
+        <item>#FFEB3B</item>
+        <item>#F9C028</item>
+        <item>#F2972C</item>
+        <item>#795548</item>
+        <item>#9E9E9E</item>
     </string-array>
 </resources>

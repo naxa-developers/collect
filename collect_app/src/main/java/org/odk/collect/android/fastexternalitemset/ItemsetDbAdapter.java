@@ -6,26 +6,27 @@ import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
-import org.odk.collect.android.database.DatabaseContext;
+import org.odk.collect.android.application.Collect;
+import org.odk.collect.android.database.AltDatabasePathContext;
 import org.odk.collect.android.storage.StoragePathProvider;
 import org.odk.collect.android.storage.StorageSubdirectory;
+import org.odk.collect.shared.PathUtils;
 
+import java.io.Closeable;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 import timber.log.Timber;
 
-import static org.odk.collect.utilities.PathUtils.getAbsoluteFilePath;
-
-public class ItemsetDbAdapter {
+public class ItemsetDbAdapter implements Closeable {
 
     private DatabaseHelper dbHelper;
     private SQLiteDatabase db;
 
     public static final String DATABASE_NAME = "itemsets.db";
     private static final String DATABASE_TABLE = "itemset_";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
 
     private static final String ITEMSET_TABLE = "itemsets";
     public static final String KEY_ITEMSET_HASH = "hash";
@@ -42,7 +43,7 @@ public class ItemsetDbAdapter {
      */
     private static class DatabaseHelper extends SQLiteOpenHelper {
         DatabaseHelper() {
-            super(new DatabaseContext(new StoragePathProvider().getDirPath(StorageSubdirectory.METADATA)), DATABASE_NAME, null, DATABASE_VERSION);
+            super(new AltDatabasePathContext(new StoragePathProvider().getOdkDirPath(StorageSubdirectory.METADATA), Collect.getInstance()), DATABASE_NAME, null, DATABASE_VERSION);
         }
 
         @Override
@@ -87,6 +88,7 @@ public class ItemsetDbAdapter {
         return this;
     }
 
+    @Override
     public void close() {
         dbHelper.close();
     }
@@ -120,7 +122,7 @@ public class ItemsetDbAdapter {
 
         ContentValues cv = new ContentValues();
         cv.put(KEY_ITEMSET_HASH, formHash);
-        cv.put(KEY_PATH, new StoragePathProvider().getFormDbPath(path));
+        cv.put(KEY_PATH, PathUtils.getRelativeFilePath(new StoragePathProvider().getOdkDirPath(StorageSubdirectory.FORMS), path));
         db.insert(ITEMSET_TABLE, null, cv);
 
         return true;
@@ -160,7 +162,7 @@ public class ItemsetDbAdapter {
         // and remove the entry from the itemsets table
         String where = KEY_PATH + "=?";
         String[] whereArgs = {
-                new StoragePathProvider().getFormDbPath(path)
+                PathUtils.getRelativeFilePath(new StoragePathProvider().getOdkDirPath(StorageSubdirectory.FORMS), path)
         };
         db.delete(ITEMSET_TABLE, where, whereArgs);
     }
@@ -168,7 +170,7 @@ public class ItemsetDbAdapter {
     public Cursor getItemsets(String path) {
         String selection = KEY_PATH + "=?";
         String[] selectionArgs = {
-                new StoragePathProvider().getFormDbPath(path)
+                PathUtils.getRelativeFilePath(new StoragePathProvider().getOdkDirPath(StorageSubdirectory.FORMS), path)
         };
         return db.query(ITEMSET_TABLE, null, selection, selectionArgs, null, null, null);
     }
@@ -187,7 +189,7 @@ public class ItemsetDbAdapter {
         if (c != null) {
             if (c.getCount() == 1) {
                 c.moveToFirst();
-                String table = getMd5FromString(getAbsoluteFilePath(storagePathProvider.getDirPath(StorageSubdirectory.FORMS), c.getString(c.getColumnIndex(KEY_PATH))));
+                String table = getMd5FromString(PathUtils.getAbsoluteFilePath(storagePathProvider.getOdkDirPath(StorageSubdirectory.FORMS), c.getString(c.getColumnIndex(KEY_PATH))));
                 db.execSQL("DROP TABLE IF EXISTS " + DATABASE_TABLE + table);
             }
             c.close();
@@ -195,7 +197,7 @@ public class ItemsetDbAdapter {
 
         String where = KEY_PATH + "=?";
         String[] whereArgs = {
-                storagePathProvider.getFormDbPath(path)
+                PathUtils.getRelativeFilePath(new StoragePathProvider().getOdkDirPath(StorageSubdirectory.FORMS), path)
         };
         db.delete(ITEMSET_TABLE, where, whereArgs);
     }

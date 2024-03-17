@@ -6,7 +6,20 @@
     android:background="?attr/colorSurface"
     android:orientation="vertical">
 
-    <include layout="@layout/material_full_screen_dialog_toolbar" />
+    <com.google.android.material.appbar.AppBarLayout xmlns:tools="http://schemas.android.com/tools"
+        style="@style/Widget.MaterialComponents.AppBarLayout.Surface"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            style="@style/Widget.AndroidShared.Toolbar.Surface.HighEmphasisControls.CloseIcon"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            tools:title="Title" />
+
+        <include layout="@layout/app_bar_shadow"/>
+    </com.google.android.material.appbar.AppBarLayout>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -29,8 +42,7 @@
                 <ImageView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    app:tint="?colorOnSurface"
-                    app:srcCompat="@drawable/ic_person_black_24dp" />
+                    app:srcCompat="@drawable/ic_person_24dp" />
 
                 <TextView
                     style="@style/TextAppearance.Collect.Headline6"
@@ -43,7 +55,7 @@
                     style="@style/TextAppearance.Collect.Body1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/margin_small"
+                    android:layout_marginTop="@dimen/margin_extra_small"
                     android:text="@string/enter_identity_description" />
 
             </LinearLayout>
@@ -52,8 +64,7 @@
                 style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
                 android:layout_width="280dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/margin_extra_large"
-                android:theme="@style/Theme.Collect.MaterialComponents.Polyfill">
+                android:layout_marginTop="@dimen/margin_extra_large">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/identity"

@@ -2,6 +2,7 @@ package org.odk.collect.android.widgets.utilities;
 
 import org.javarosa.core.model.data.DecimalData;
 import org.javarosa.core.model.data.IntegerData;
+import org.javarosa.core.model.data.StringData;
 import org.javarosa.form.api.FormEntryPrompt;
 import org.junit.Test;
 
@@ -20,16 +21,22 @@ public class StringWidgetUtilsTest {
         assertEquals(Integer.valueOf(0), StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new IntegerData(0)));
         assertEquals(Integer.valueOf(-15), StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new IntegerData(-15)));
         assertEquals(Integer.valueOf(15), StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new IntegerData(15)));
+        assertEquals(Integer.valueOf(15), StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new DecimalData(15.0)));
+        assertEquals(Integer.valueOf(15), StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new StringData("15")));
+        assertNull(StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new StringData("abc")));
     }
 
     @Test
     public void getDoubleAnswerValueFromIAnswerDataTest() {
         assertNull(StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(null));
-        assertEquals(new Double(0), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(0)));
-        assertEquals(new Double(-15), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(-15)));
-        assertEquals(new Double(-15.123), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(-15.123)));
-        assertEquals(new Double(15), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(15)));
-        assertEquals(new Double(15.123), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(15.123)));
+        assertEquals(Double.valueOf(0), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(0)));
+        assertEquals(Double.valueOf(-15), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(-15)));
+        assertEquals(Double.valueOf(-15.123), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(-15.123)));
+        assertEquals(Double.valueOf(15), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(15)));
+        assertEquals(Double.valueOf(15.123), StringWidgetUtils.getDoubleAnswerValueFromIAnswerData(new DecimalData(15.123)));
+        assertEquals(Integer.valueOf(15), StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new IntegerData(15)));
+        assertEquals(Integer.valueOf(15), StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new StringData("15")));
+        assertNull(StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(new StringData("abc")));
     }
 
     @Test

@@ -1,184 +1,140 @@
 package org.odk.collect.android.regression;
 
-import android.Manifest;
-
-import androidx.test.rule.ActivityTestRule;
-import androidx.test.rule.GrantPermissionRule;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
-import org.odk.collect.android.R;
-import org.odk.collect.android.activities.MainMenuActivity;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
-import org.odk.collect.android.support.pages.AdminSettingsPage;
-import org.odk.collect.android.support.pages.GeneralSettingsPage;
+import org.odk.collect.android.support.rules.CollectTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
+import org.odk.collect.android.support.pages.AccessControlPage;
 import org.odk.collect.android.support.pages.MainMenuPage;
+import org.odk.collect.android.support.pages.ProjectSettingsPage;
 import org.odk.collect.android.support.pages.ResetApplicationDialog;
 
 //Issue NODK-240
 public class ResetApplicationTest {
 
-    public ActivityTestRule<MainMenuActivity> rule = new ActivityTestRule<>(MainMenuActivity.class);
+    public CollectTestRule rule = new CollectTestRule();
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_PHONE_STATE)
-            )
-            .around(new ResetStateRule())
-            .around(new CopyFormRule("All_widgets.xml"))
+    public RuleChain copyFormChain = TestRuleChain.chain()
             .around(rule);
 
     @Test
     public void when_rotateScreen_should_resetDialogNotDisappear() {
         //TestCase1
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickAdminSettings()
+        rule.startAtMainMenu()
+                .openProjectSettingsDialog()
+                .clickSettings()
+                .clickProjectManagement()
                 .clickOnResetApplication()
-                .assertText(R.string.reset_settings_dialog_title)
-                .assertDisabled(R.string.reset_settings_button_reset)
-                .rotateToLandscape(new ResetApplicationDialog(rule))
-                .assertText(R.string.reset_settings_dialog_title)
-                .assertDisabled(R.string.reset_settings_button_reset)
-                .rotateToPortrait(new ResetApplicationDialog(rule))
-                .assertText(R.string.reset_settings_dialog_title)
-                .assertDisabled(R.string.reset_settings_button_reset);
+                .assertText(org.odk.collect.strings.R.string.reset_settings_dialog_title)
+                .assertDisabled(org.odk.collect.strings.R.string.reset_settings_button_reset)
+                .rotateToLandscape(new ResetApplicationDialog())
+                .assertText(org.odk.collect.strings.R.string.reset_settings_dialog_title)
+                .assertDisabled(org.odk.collect.strings.R.string.reset_settings_button_reset)
+                .rotateToPortrait(new ResetApplicationDialog())
+                .assertText(org.odk.collect.strings.R.string.reset_settings_dialog_title)
+                .assertDisabled(org.odk.collect.strings.R.string.reset_settings_button_reset);
     }
 
     @Test
     public void savedAndBlankForms_shouldBeReset() {
         //TestCase1,4
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("all-widgets.xml")
                 .startBlankForm("All widgets")
                 .clickGoToArrow()
                 .clickJumpEndButton()
-                .clickSaveAndExit()
-                .clickEditSavedForm()
+                .clickSaveAsDraft()
+                .clickDrafts()
                 .assertText("All widgets")
-                .pressBack(new MainMenuPage(rule))
-                .clickOnMenu()
-                .clickAdminSettings()
+                .pressBack(new MainMenuPage())
+                .openProjectSettingsDialog()
+                .clickSettings()
+                .clickProjectManagement()
                 .clickOnResetApplication()
-                .assertDisabled(R.string.reset_settings_button_reset)
-                .clickOnString(R.string.reset_saved_forms)
-                .clickOnString(R.string.reset_blank_forms)
-                .clickOnString(R.string.reset_settings_button_reset)
+                .assertDisabled(org.odk.collect.strings.R.string.reset_settings_button_reset)
+                .clickOnString(org.odk.collect.strings.R.string.reset_saved_forms)
+                .clickOnString(org.odk.collect.strings.R.string.reset_blank_forms)
+                .clickOnString(org.odk.collect.strings.R.string.reset_settings_button_reset)
                 .clickOKOnDialog();
-        new MainMenuPage(rule)
+        new MainMenuPage()
                 .clickFillBlankForm()
                 .assertTextDoesNotExist("All widgets")
-                .pressBack(new MainMenuPage(rule))
-                .clickEditSavedForm()
+                .pressBack(new MainMenuPage())
+                .clickDrafts(false)
                 .assertTextDoesNotExist("All widgets");
     }
 
     @Test
     public void adminSettings_shouldBeReset() {
         //TestCase2
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickAdminSettings()
+        rule.startAtMainMenu()
+                .openProjectSettingsDialog()
+                .clickSettings()
+                .clickAccessControl()
                 .openUserSettings()
                 .uncheckServerOption()
-                .pressBack(new AdminSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
-                .clickOnMenu()
-                .clickGeneralSettings()
+                .pressBack(new AccessControlPage())
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new MainMenuPage())
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .checkIfServerOptionIsNotDisplayed()
-                .pressBack(new MainMenuPage(rule))
-                .clickOnMenu()
-                .clickAdminSettings()
+                .pressBack(new MainMenuPage())
+                .openProjectSettingsDialog()
+                .clickSettings()
+                .clickProjectManagement()
                 .clickOnResetApplication()
-                .clickOnString(R.string.reset_settings)
-                .clickOnString(R.string.reset_settings_button_reset)
+                .clickOnString(org.odk.collect.strings.R.string.reset_settings)
+                .clickOnString(org.odk.collect.strings.R.string.reset_settings_button_reset)
                 .clickOKOnDialog();
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+        new MainMenuPage()
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .checkIfServerOptionIsDisplayed();
     }
 
     @Test
     public void userInterfaceSettings_shouldBeReset() {
         //TestCase3
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+        rule.startAtMainMenu()
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .clickOnUserInterface()
-                .assertText(R.string.theme_light)
+                .assertText(org.odk.collect.strings.R.string.theme_system)
                 .clickOnTheme()
-                .clickOnString(R.string.theme_dark);
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+                .clickOnString(org.odk.collect.strings.R.string.theme_dark);
+
+        new MainMenuPage()
+                .assertOnPage()
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .clickOnUserInterface()
-                .assertText(R.string.theme_dark)
+                .assertText(org.odk.collect.strings.R.string.theme_dark)
                 .clickOnLanguage()
-                .clickOnSelectedLanguage("español");
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+                .clickOnSelectedLanguage("español")
+
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .clickOnUserInterface()
                 .assertText("español")
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
-                .clickOnMenu()
-                .clickAdminSettings()
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new MainMenuPage())
+                .openProjectSettingsDialog()
+                .clickSettings()
+                .clickProjectManagement()
                 .clickOnResetApplication()
-                .clickOnString(R.string.reset_settings)
-                .clickOnString(R.string.reset_settings_button_reset)
-                .clickOKOnDialog();
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+                .clickOnString(org.odk.collect.strings.R.string.reset_settings)
+                .clickOnString(org.odk.collect.strings.R.string.reset_settings_button_reset)
+                .clickOKOnDialog(new MainMenuPage())
+
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .clickOnUserInterface()
-                .assertText(R.string.theme_light)
-                .assertTextDoesNotExist(R.string.theme_dark)
-                .assertText(R.string.use_device_language)
+                .assertText(org.odk.collect.strings.R.string.theme_system)
+                .assertTextDoesNotExist(org.odk.collect.strings.R.string.theme_dark)
+                .assertText(org.odk.collect.strings.R.string.use_device_language)
                 .assertTextDoesNotExist("español");
     }
-
-    @Test
-    public void formManagementSettings_shouldBeReset() {
-        //TestCase3
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
-                .openFormManagement()
-                .clickOnAutoSend()
-                .clickOnString(R.string.wifi_autosend)
-                .assertText(R.string.wifi_autosend)
-                .clickOnDefaultToFinalized()
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
-                .startBlankForm("All widgets")
-                .clickGoToArrow()
-                .clickJumpEndButton()
-                .assertMarkFinishedIsNotSelected()
-                .clickSaveAndExit()
-                .clickOnMenu()
-                .clickAdminSettings()
-                .clickOnResetApplication()
-                .clickOnString(R.string.reset_settings)
-                .clickOnString(R.string.reset_settings_button_reset)
-                .clickOKOnDialog();
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
-                .openFormManagement()
-                .assertText(R.string.off)
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
-                .startBlankForm("All widgets")
-                .clickGoToArrow()
-                .clickJumpEndButton()
-                .assertMarkFinishedIsSelected()
-                .clickSaveAndExit();
-    }
-
 }

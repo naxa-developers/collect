@@ -16,58 +16,76 @@
 
 package org.odk.collect.android.feature.formentry;
 
-import android.Manifest;
-
-import androidx.test.rule.GrantPermissionRule;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
-import org.odk.collect.android.R;
-import org.odk.collect.android.instances.Instance;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.CollectTestRule;
-import org.odk.collect.android.support.ResetStateRule;
+import org.odk.collect.android.support.rules.CollectTestRule;
+import org.odk.collect.android.support.TestDependencies;
+import org.odk.collect.android.support.rules.TestRuleChain;
+import org.odk.collect.android.support.pages.MainMenuPage;
+import org.odk.collect.android.support.pages.SendFinalizedFormPage;
+import org.odk.collect.forms.instances.Instance;
 
 public class EncryptedFormTest {
 
-    @Rule
+    TestDependencies testDependencies = new TestDependencies();
+
     public CollectTestRule rule = new CollectTestRule();
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_PHONE_STATE)
-            )
-            .around(new ResetStateRule())
-            .around(new CopyFormRule("encrypted.xml"))
-            .around(new CopyFormRule("encrypted-no-instanceID.xml"));
+    public RuleChain copyFormChain = TestRuleChain.chain(testDependencies)
+            .around(rule);
 
     @Test
-    public void instanceOfEncryptedForm_cantBeEditedWhenFinalized() {
-        rule.mainMenu()
+    public void instanceOfEncryptedForm_cantBeViewedAfterFinalizing() {
+        rule.startAtMainMenu()
+                .copyForm("encrypted.xml")
+
                 .startBlankForm("encrypted")
                 .assertQuestion("Question 1")
                 .swipeToEndScreen()
-                .clickSaveAndExit()
-                .checkIsToastWithMessageDisplayed(R.string.data_saved_ok)
-                .clickEditSavedForm()
-                .checkInstanceState("encrypted", Instance.STATUS_COMPLETE)
-                .clickOnFormWithDialog("encrypted")
-                .assertText(R.string.cannot_edit_completed_form);
+                .clickFinalize()
+
+                .clickSendFinalizedForm(1)
+                .clickOnText("encrypted")
+                .checkIsToastWithMessageDisplayed(org.odk.collect.strings.R.string.encrypted_form)
+                .assertOnPage();
     }
 
     @Test
+    public void instanceOfEncryptedForm_cantBeViewedAfterSending() {
+        rule.startAtMainMenu()
+                .copyForm("encrypted.xml")
+                .setServer(testDependencies.server.getURL())
+
+                .startBlankForm("encrypted")
+                .assertQuestion("Question 1")
+                .swipeToEndScreen()
+                .clickFinalize()
+
+                .clickSendFinalizedForm(1)
+                .clickSelectAll()
+                .clickSendSelected()
+                .clickOK(new SendFinalizedFormPage())
+                .pressBack(new MainMenuPage())
+
+                .clickViewSentForm(1)
+                .clickOnText("encrypted")
+                .assertText(org.odk.collect.strings.R.string.encrypted_form)
+                .assertOnPage();
+    }
+
+    //TestCase47
+    @Test
     public void instanceOfEncryptedFormWithoutInstanceID_failsFinalizationWithMessage() {
-        rule.mainMenu()
+        rule.startAtMainMenu()
+                .copyForm("encrypted-no-instanceID.xml")
                 .startBlankForm("encrypted-no-instanceID")
                 .assertQuestion("Question 1")
                 .swipeToEndScreen()
-                .clickSaveAndExit()
+                .clickFinalize()
                 .checkIsToastWithMessageDisplayed("This form does not specify an instanceID. You must specify one to enable encryption. Form has not been saved as finalized.")
-                .clickEditSavedForm()
+                .clickDrafts()
                 .checkInstanceState("encrypted-no-instanceID", Instance.STATUS_INCOMPLETE);
     }
 }

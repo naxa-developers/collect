@@ -23,11 +23,11 @@ import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.StringData;
 import org.javarosa.form.api.FormEntryPrompt;
 
-import org.odk.collect.android.R;
 import org.odk.collect.android.databinding.GeoWidgetAnswerBinding;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
 import org.odk.collect.android.widgets.interfaces.GeoDataRequester;
+import org.odk.collect.android.widgets.utilities.GeoWidgetUtils;
 import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
 
 @SuppressLint("ViewConstructor")
@@ -40,6 +40,8 @@ public class GeoShapeWidget extends QuestionWidget implements WidgetDataReceiver
     public GeoShapeWidget(Context context, QuestionDetails questionDetails, WaitingForDataRegistry waitingForDataRegistry,
                           GeoDataRequester geoDataRequester) {
         super(context, questionDetails);
+        render();
+
         this.waitingForDataRegistry = waitingForDataRegistry;
         this.geoDataRequester = geoDataRequester;
     }
@@ -48,28 +50,28 @@ public class GeoShapeWidget extends QuestionWidget implements WidgetDataReceiver
     protected View onCreateAnswerView(Context context, FormEntryPrompt prompt, int answerFontSize) {
         binding = GeoWidgetAnswerBinding.inflate(((Activity) context).getLayoutInflater());
 
-        binding.simpleButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, answerFontSize);
         binding.geoAnswerText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, answerFontSize);
 
         binding.simpleButton.setOnClickListener(v ->
-                geoDataRequester.requestGeoShape(context, prompt, getAnswerText(), waitingForDataRegistry));
+                geoDataRequester.requestGeoShape(prompt, getAnswerText(), waitingForDataRegistry));
 
-        String stringAnswer = prompt.getAnswerText();
+        String stringAnswer = GeoWidgetUtils.getGeoPolyAnswerToDisplay(prompt.getAnswerText());
         binding.geoAnswerText.setText(stringAnswer);
+        binding.geoAnswerText.setVisibility(binding.geoAnswerText.getText().toString().isBlank() ? GONE : VISIBLE);
 
         boolean dataAvailable = stringAnswer != null && !stringAnswer.isEmpty();
 
         if (getFormEntryPrompt().isReadOnly()) {
             if (dataAvailable) {
-                binding.simpleButton.setText(R.string.geoshape_view_read_only);
+                binding.simpleButton.setText(org.odk.collect.strings.R.string.geoshape_view_read_only);
             } else {
                 binding.simpleButton.setVisibility(View.GONE);
             }
         } else {
             if (dataAvailable) {
-                binding.simpleButton.setText(R.string.geoshape_view_change_location);
+                binding.simpleButton.setText(org.odk.collect.strings.R.string.geoshape_view_change_location);
             } else {
-                binding.simpleButton.setText(R.string.get_shape);
+                binding.simpleButton.setText(org.odk.collect.strings.R.string.get_shape);
             }
         }
 
@@ -84,7 +86,8 @@ public class GeoShapeWidget extends QuestionWidget implements WidgetDataReceiver
     @Override
     public void clearAnswer() {
         binding.geoAnswerText.setText(null);
-        binding.simpleButton.setText(R.string.get_shape);
+        binding.geoAnswerText.setVisibility(GONE);
+        binding.simpleButton.setText(org.odk.collect.strings.R.string.get_shape);
         widgetValueChanged();
     }
 
@@ -104,7 +107,8 @@ public class GeoShapeWidget extends QuestionWidget implements WidgetDataReceiver
     @Override
     public void setData(Object answer) {
         binding.geoAnswerText.setText(answer.toString());
-        binding.simpleButton.setText(answer.toString().isEmpty() ? R.string.get_shape : R.string.geoshape_view_change_location);
+        binding.geoAnswerText.setVisibility(binding.geoAnswerText.getText().toString().isBlank() ? GONE : VISIBLE);
+        binding.simpleButton.setText(answer.toString().isEmpty() ? org.odk.collect.strings.R.string.get_shape : org.odk.collect.strings.R.string.geoshape_view_change_location);
         widgetValueChanged();
     }
 

@@ -4,22 +4,30 @@ import android.app.Activity;
 import android.content.Context;
 import android.view.View;
 
+import org.javarosa.core.model.SelectChoice;
 import org.javarosa.form.api.FormEntryPrompt;
-import org.odk.collect.android.R;
 import org.odk.collect.android.databinding.SelectMinimalWidgetAnswerBinding;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.utilities.QuestionFontSizeUtils;
-import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
+import org.odk.collect.android.widgets.QuestionWidget;
 import org.odk.collect.android.widgets.interfaces.MultiChoiceWidget;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
+import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
 import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
 
-public abstract class SelectMinimalWidget extends ItemsWidget implements WidgetDataReceiver, MultiChoiceWidget {
+import java.util.List;
+
+public abstract class SelectMinimalWidget extends QuestionWidget implements WidgetDataReceiver, MultiChoiceWidget {
+
+    final List<SelectChoice> items;
+
     SelectMinimalWidgetAnswerBinding binding;
     private final WaitingForDataRegistry waitingForDataRegistry;
 
-    public SelectMinimalWidget(Context context, QuestionDetails prompt, WaitingForDataRegistry waitingForDataRegistry) {
+    public SelectMinimalWidget(Context context, QuestionDetails prompt, WaitingForDataRegistry waitingForDataRegistry, SelectChoiceLoader selectChoiceLoader) {
         super(context, prompt);
         this.waitingForDataRegistry = waitingForDataRegistry;
+        items = ItemsWidgetUtils.loadItemsAndHandleErrors(this, questionDetails.getPrompt(), selectChoiceLoader);
     }
 
     @Override
@@ -39,7 +47,7 @@ public abstract class SelectMinimalWidget extends ItemsWidget implements WidgetD
 
     @Override
     public void clearAnswer() {
-        binding.answer.setText(R.string.select_answer);
+        binding.answer.setText(org.odk.collect.strings.R.string.select_answer);
         widgetValueChanged();
     }
 

@@ -11,7 +11,7 @@ import org.odk.collect.android.widgets.base.GeneralStringWidgetTest;
 
 import static junit.framework.TestCase.assertEquals;
 import static org.mockito.Mockito.when;
-import static org.odk.collect.android.utilities.WidgetAppearanceUtils.THOUSANDS_SEP;
+import static org.odk.collect.android.utilities.Appearances.THOUSANDS_SEP;
 
 /**
  * @author James Knight
@@ -21,7 +21,7 @@ public class StringNumberWidgetTest extends GeneralStringWidgetTest<StringNumber
     @NonNull
     @Override
     public StringNumberWidget createWidget() {
-        return new StringNumberWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID", readOnlyOverride));
+        return new StringNumberWidget(activity, new QuestionDetails(formEntryPrompt, readOnlyOverride));
     }
 
     @NonNull
@@ -32,14 +32,17 @@ public class StringNumberWidgetTest extends GeneralStringWidgetTest<StringNumber
 
     @Test
     public void digitsNumberShouldNotBeLimited() {
-        getWidget().answerText.setText("123456789123456789123456789123456789");
+        getWidget().widgetAnswerText.setAnswer("123456789123456789123456789123456789");
         assertEquals("123456789123456789123456789123456789", getWidget().getAnswerText());
     }
 
     @Test
     public void separatorsShouldBeAddedWhenEnabled() {
         when(formEntryPrompt.getAppearanceHint()).thenReturn(THOUSANDS_SEP);
-        getWidget().answerText.setText("123456789123456789123456789123456789");
-        assertEquals("123,456,789,123,456,789,123,456,789,123,456,789", getWidget().answerText.getText().toString());
+        getWidget().widgetAnswerText.setAnswer("123456789123456789123456789123456789");
+
+        assertEquals("123,456,789,123,456,789,123,456,789,123,456,789", getWidget().widgetAnswerText.getAnswer());
+        assertEquals("123,456,789,123,456,789,123,456,789,123,456,789", getWidget().widgetAnswerText.getBinding().editText.getText().toString());
+        assertEquals("123,456,789,123,456,789,123,456,789,123,456,789", getWidget().widgetAnswerText.getBinding().textView.getText().toString());
     }
 }

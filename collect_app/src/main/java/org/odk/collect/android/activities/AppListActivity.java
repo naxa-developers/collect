@@ -18,59 +18,53 @@ package org.odk.collect.android.activities;
 
 import android.database.Cursor;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CursorAdapter;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 
-import com.google.android.material.bottomsheet.BottomSheetDialog;
+import androidx.annotation.LayoutRes;
+import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SearchView;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuItemCompat;
 
 import org.odk.collect.android.R;
-import org.odk.collect.android.adapters.SortDialogAdapter;
-import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.listeners.RecyclerViewClickListener;
-import org.odk.collect.android.provider.InstanceProviderAPI.InstanceColumns;
-import org.odk.collect.android.utilities.MultiClickGuard;
-import org.odk.collect.android.utilities.SnackbarUtils;
+import org.odk.collect.android.database.instances.DatabaseInstanceColumns;
+import org.odk.collect.android.formlists.sorting.FormListSortingBottomSheetDialog;
+import org.odk.collect.android.formlists.sorting.FormListSortingOption;
+import org.odk.collect.android.injection.DaggerUtils;
+import org.odk.collect.androidshared.ui.multiclicksafe.MultiClickGuard;
+import org.odk.collect.settings.SettingsProvider;
+import org.odk.collect.strings.localization.LocalizedActivity;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 
-import androidx.annotation.LayoutRes;
-import androidx.annotation.NonNull;
-import androidx.appcompat.widget.SearchView;
-import androidx.core.content.ContextCompat;
-import androidx.core.view.MenuItemCompat;
-import androidx.recyclerview.widget.DefaultItemAnimator;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
+import javax.inject.Inject;
+
 import timber.log.Timber;
 
-import static org.odk.collect.android.utilities.ApplicationConstants.SortingOrder.BY_NAME_ASC;
+public abstract class AppListActivity extends LocalizedActivity {
 
-abstract class AppListActivity extends CollectAbstractActivity {
-
-    protected static final int LOADER_ID = 0x01;
+    public static final int LOADER_ID = 0x01;
     private static final String SELECTED_INSTANCES = "selectedInstances";
     private static final String IS_SEARCH_BOX_SHOWN = "isSearchBoxShown";
     private static final String SEARCH_TEXT = "searchText";
 
     protected CursorAdapter listAdapter;
     protected LinkedHashSet<Long> selectedInstances = new LinkedHashSet<>();
-    protected int[] sortingOptions;
+    protected List<FormListSortingOption> sortingOptions;
     protected Integer selectedSortingOrder;
     protected ListView listView;
     protected LinearLayout llParent;
     protected ProgressBar progressBar;
-    private BottomSheetDialog bottomSheetDialog;
 
     private String filterText;
     private String savedFilterText;
@@ -78,8 +72,14 @@ abstract class AppListActivity extends CollectAbstractActivity {
 
     private SearchView searchView;
 
-    private boolean canHideProgressBar;
-    private boolean progressBarVisible;
+    @Inject
+    SettingsProvider settingsProvider;
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        DaggerUtils.getComponent(this).inject(this);
+    }
 
     // toggles to all checked or all unchecked
     // returns:
@@ -114,16 +114,25 @@ abstract class AppListActivity extends CollectAbstractActivity {
     // Function to toggle button label
     public static void toggleButtonLabel(Button toggleButton, ListView lv) {
         if (lv.getCheckedItemCount() != lv.getCount()) {
-            toggleButton.setText(R.string.select_all);
+            toggleButton.setText(org.odk.collect.strings.R.string.select_all);
         } else {
-            toggleButton.setText(R.string.clear_all);
+            toggleButton.setText(org.odk.collect.strings.R.string.clear_all);
         }
+    }
+
+    @Override
+    public void setContentView(View view) {
+        super.setContentView(view);
+        init();
     }
 
     @Override
     public void setContentView(@LayoutRes int layoutResID) {
         super.setContentView(layoutResID);
+        init();
+    }
 
+    private void init() {
         listView = findViewById(android.R.id.list);
         listView.setOnItemClickListener((AdapterView.OnItemClickListener) this);
         listView.setEmptyView(findViewById(android.R.id.empty));
@@ -131,7 +140,7 @@ abstract class AppListActivity extends CollectAbstractActivity {
         llParent = findViewById(R.id.llParent);
 
         // Use the nicer-looking drawable with Material Design insets.
-        listView.setDivider(ContextCompat.getDrawable(this, R.drawable.list_item_divider));
+        listView.setDivider(ContextCompat.getDrawable(this, org.odk.collect.androidshared.R.drawable.list_item_divider));
         listView.setDividerHeight(1);
 
         setSupportActionBar(findViewById(R.id.toolbar));
@@ -152,7 +161,7 @@ abstract class AppListActivity extends CollectAbstractActivity {
             outState.putBoolean(IS_SEARCH_BOX_SHOWN, !searchView.isIconified());
             outState.putString(SEARCH_TEXT, String.valueOf(searchView.getQuery()));
         } else {
-            Timber.e("Unexpected null search view (issue #1412)");
+            Timber.e(new Error("Unexpected null search view (issue #1412)"));
         }
     }
 
@@ -166,13 +175,11 @@ abstract class AppListActivity extends CollectAbstractActivity {
 
     @Override
     public boolean onCreateOptionsMenu(final Menu menu) {
-        getMenuInflater().inflate(R.menu.list_menu, menu);
+        getMenuInflater().inflate(R.menu.blank_form_list_menu, menu);
         final MenuItem sortItem = menu.findItem(R.id.menu_sort);
         final MenuItem searchItem = menu.findItem(R.id.menu_filter);
         searchView = (SearchView) MenuItemCompat.getActionView(searchItem);
-        EditText searchEditText = searchView.findViewById(androidx.appcompat.R.id.search_src_text);
-        searchEditText.setTextColor(themeUtils.getColorOnPrimary());
-        searchView.setQueryHint(getResources().getString(R.string.search));
+        searchView.setQueryHint(getResources().getString(org.odk.collect.strings.R.string.search));
         searchView.setMaxWidth(Integer.MAX_VALUE);
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
@@ -218,18 +225,20 @@ abstract class AppListActivity extends CollectAbstractActivity {
             return true;
         }
 
-        switch (item.getItemId()) {
-            case R.id.menu_sort:
-                showBottomSheetDialog();
-                return true;
+        if (item.getItemId() == R.id.menu_sort) {
+            new FormListSortingBottomSheetDialog(
+                    this,
+                    sortingOptions,
+                    selectedSortingOrder,
+                    selectedOption -> {
+                        saveSelectedSortingOrder(selectedOption);
+                        updateAdapter();
+                    }
+            ).show();
+            return true;
         }
 
         return super.onOptionsItemSelected(item);
-    }
-
-    private void performSelectedSearch(int position) {
-        saveSelectedSortingOrder(position);
-        updateAdapter();
     }
 
     protected void checkPreviouslyCheckedItems() {
@@ -239,7 +248,7 @@ abstract class AppListActivity extends CollectAbstractActivity {
         Cursor cursor = listAdapter.getCursor();
         if (cursor != null && cursor.moveToFirst()) {
             do {
-                long instanceId = cursor.getLong(cursor.getColumnIndex(InstanceColumns._ID));
+                long instanceId = cursor.getLong(cursor.getColumnIndex(DatabaseInstanceColumns._ID));
                 if (selectedInstances.contains(instanceId)) {
                     selectedPositions.add(listViewPosition);
                 }
@@ -266,16 +275,11 @@ abstract class AppListActivity extends CollectAbstractActivity {
 
     private void saveSelectedSortingOrder(int selectedStringOrder) {
         selectedSortingOrder = selectedStringOrder;
-        PreferenceManager.getDefaultSharedPreferences(Collect.getInstance())
-                .edit()
-                .putInt(getSortingOrderKey(), selectedStringOrder)
-                .apply();
+        settingsProvider.getUnprotectedSettings().save(getSortingOrderKey(), selectedStringOrder);
     }
 
     protected void restoreSelectedSortingOrder() {
-        selectedSortingOrder = PreferenceManager
-                .getDefaultSharedPreferences(Collect.getInstance())
-                .getInt(getSortingOrderKey(), BY_NAME_ASC);
+        selectedSortingOrder = settingsProvider.getUnprotectedSettings().getInt(getSortingOrderKey());
     }
 
     protected int getSelectedSortingOrder() {
@@ -293,50 +297,15 @@ abstract class AppListActivity extends CollectAbstractActivity {
         searchView.setQuery("", false);
     }
 
-    private void showBottomSheetDialog() {
-        bottomSheetDialog = new BottomSheetDialog(this, themeUtils.getBottomDialogTheme());
-        final View sheetView = getLayoutInflater().inflate(R.layout.bottom_sheet, null);
-        final RecyclerView recyclerView = sheetView.findViewById(R.id.recyclerView);
-
-        final SortDialogAdapter adapter = new SortDialogAdapter(this, recyclerView, sortingOptions, getSelectedSortingOrder(), new RecyclerViewClickListener() {
-            @Override
-            public void onItemClicked(SortDialogAdapter.ViewHolder holder, int position) {
-                holder.updateItemColor(selectedSortingOrder);
-                performSelectedSearch(position);
-                bottomSheetDialog.dismiss();
-            }
-        });
-        RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(getApplicationContext());
-        recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setAdapter(adapter);
-        recyclerView.setItemAnimator(new DefaultItemAnimator());
-
-        bottomSheetDialog.setContentView(sheetView);
-        bottomSheetDialog.show();
-    }
-
-    protected void showSnackbar(@NonNull String result) {
-        SnackbarUtils.showShortSnackbar(llParent, result);
-    }
-
-    protected void hideProgressBarIfAllowed() {
-        if (canHideProgressBar && progressBarVisible) {
-            hideProgressBar();
-        }
-    }
-
     protected void hideProgressBarAndAllow() {
-        this.canHideProgressBar = true;
         hideProgressBar();
     }
 
     private void hideProgressBar() {
         progressBar.setVisibility(View.GONE);
-        progressBarVisible = false;
     }
 
     protected void showProgressBar() {
         progressBar.setVisibility(View.VISIBLE);
-        progressBarVisible = true;
     }
 }

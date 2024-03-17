@@ -3,14 +3,16 @@ package org.odk.collect.android.widgets;
 import androidx.annotation.NonNull;
 
 import org.javarosa.core.model.data.IntegerData;
+import org.mockito.Mock;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.junit.Test;
 import org.odk.collect.android.widgets.base.GeneralExStringWidgetTest;
 import org.odk.collect.android.widgets.support.FakeWaitingForDataRegistry;
+import org.odk.collect.android.widgets.utilities.StringRequester;
 
 import static junit.framework.TestCase.assertEquals;
 import static org.mockito.Mockito.when;
-import static org.odk.collect.android.utilities.WidgetAppearanceUtils.THOUSANDS_SEP;
+import static org.odk.collect.android.utilities.Appearances.THOUSANDS_SEP;
 
 /**
  * @author James Knight
@@ -18,10 +20,13 @@ import static org.odk.collect.android.utilities.WidgetAppearanceUtils.THOUSANDS_
 
 public class ExIntegerWidgetTest extends GeneralExStringWidgetTest<ExIntegerWidget, IntegerData> {
 
+    @Mock
+    StringRequester stringRequester;
+
     @NonNull
     @Override
     public ExIntegerWidget createWidget() {
-        return new ExIntegerWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID"), new FakeWaitingForDataRegistry());
+        return new ExIntegerWidget(activity, new QuestionDetails(formEntryPrompt), new FakeWaitingForDataRegistry(), stringRequester);
     }
 
     @NonNull
@@ -42,14 +47,17 @@ public class ExIntegerWidgetTest extends GeneralExStringWidgetTest<ExIntegerWidg
 
     @Test
     public void digitsAboveLimitOfNineShouldBeTruncatedFromRight() {
-        getWidget().answerText.setText("123456789123");
-        assertEquals("123456789", getWidget().getAnswerText());
+        getWidget().binding.widgetAnswerText.setAnswer("123456789123");
+        assertEquals("123456789", getWidget().binding.widgetAnswerText.getAnswer());
     }
 
     @Test
     public void separatorsShouldBeAddedWhenEnabled() {
         when(formEntryPrompt.getAppearanceHint()).thenReturn(THOUSANDS_SEP);
-        getWidget().answerText.setText("123456789");
-        assertEquals("123,456,789", getWidget().answerText.getText().toString());
+        getWidget().binding.widgetAnswerText.setAnswer("123456789");
+
+        assertEquals("123,456,789", getWidget().binding.widgetAnswerText.getAnswer());
+        assertEquals("123,456,789", getWidget().binding.widgetAnswerText.getBinding().editText.getText().toString());
+        assertEquals("123,456,789", getWidget().binding.widgetAnswerText.getBinding().textView.getText().toString());
     }
 }

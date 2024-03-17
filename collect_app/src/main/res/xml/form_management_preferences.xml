@@ -4,6 +4,7 @@
     android:title="@string/form_management_preferences">
 
     <PreferenceCategory
+        android:key="form_update_category"
         android:title="@string/form_update_category"
         app:allowDividerAbove="false"
         app:allowDividerBelow="false"
@@ -63,11 +64,6 @@
         app:allowDividerAbove="false"
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false">
-        <CheckBoxPreference
-            android:key="default_completed"
-            android:summary="@string/default_completed_summary"
-            android:title="@string/default_completed"
-            app:iconSpaceReserved="false" />
         <ListPreference
             android:dialogTitle="@string/constraint_behavior"
             android:entries="@array/constraint_behavior_entries"

@@ -40,15 +40,20 @@ import org.javarosa.core.reference.InvalidReferenceException;
 import org.javarosa.core.reference.ReferenceManager;
 import org.javarosa.form.api.FormEntryCaption;
 import org.odk.collect.android.R;
-import org.odk.collect.android.external.ExternalSelectChoice;
+import org.odk.collect.android.dynamicpreload.ExternalSelectChoice;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.listeners.AdvanceToNextListener;
-import org.odk.collect.android.utilities.FileUtils;
+import org.odk.collect.android.utilities.HtmlUtils;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
+import org.odk.collect.androidshared.bitmap.ImageFileUtils;
 import org.odk.collect.android.utilities.SelectOneWidgetUtils;
+import org.odk.collect.android.widgets.QuestionWidget;
 import org.odk.collect.android.widgets.interfaces.MultiChoiceWidget;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 
 import timber.log.Timber;
 
@@ -63,7 +68,7 @@ import timber.log.Timber;
  * @author Jeff Beorse (jeff@beorse.net)
  */
 @SuppressLint("ViewConstructor")
-public class ListWidget extends ItemsWidget implements MultiChoiceWidget, OnCheckedChangeListener {
+public class ListWidget extends QuestionWidget implements MultiChoiceWidget, OnCheckedChangeListener {
 
     @Nullable
     private AdvanceToNextListener listener;
@@ -71,11 +76,18 @@ public class ListWidget extends ItemsWidget implements MultiChoiceWidget, OnChec
     private final boolean autoAdvance;
 
     ArrayList<RadioButton> buttons;
+    private final boolean displayLabel;
+    private final List<SelectChoice> items;
 
-    public ListWidget(Context context, QuestionDetails questionDetails, boolean displayLabel, boolean autoAdvance) {
+    public ListWidget(Context context, QuestionDetails questionDetails, boolean displayLabel, boolean autoAdvance, SelectChoiceLoader selectChoiceLoader) {
         super(context, questionDetails);
+        render();
+
+        items = ItemsWidgetUtils.loadItemsAndHandleErrors(this, questionDetails.getPrompt(), selectChoiceLoader);
 
         this.autoAdvance = autoAdvance;
+        this.displayLabel = displayLabel;
+
         if (context instanceof AdvanceToNextListener) {
             listener = (AdvanceToNextListener) context;
         }
@@ -130,7 +142,7 @@ public class ListWidget extends ItemsWidget implements MultiChoiceWidget, OnChec
                                 DisplayMetrics metrics = context.getResources().getDisplayMetrics();
                                 int screenWidth = metrics.widthPixels;
                                 int screenHeight = metrics.heightPixels;
-                                b = FileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
+                                b = ImageFileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
                             } catch (OutOfMemoryError e) {
                                 errorMsg = "ERROR: " + e.getMessage();
                             }
@@ -145,19 +157,19 @@ public class ListWidget extends ItemsWidget implements MultiChoiceWidget, OnChec
                                 // An error hasn't been logged and loading the image failed, so it's
                                 // likely
                                 // a bad file.
-                                errorMsg = getContext().getString(R.string.file_invalid, imageFile);
+                                errorMsg = getContext().getString(org.odk.collect.strings.R.string.file_invalid, imageFile);
 
                             }
                         } else {
                             // An error hasn't been logged. We should have an image, but the file
                             // doesn't
                             // exist.
-                            errorMsg = getContext().getString(R.string.file_missing, imageFile);
+                            errorMsg = getContext().getString(org.odk.collect.strings.R.string.file_missing, imageFile);
                         }
 
                         if (errorMsg != null) {
                             // errorMsg is only set when an error has occured
-                            Timber.e(errorMsg);
+                            Timber.e(new Error(errorMsg));
                             missingImage = new TextView(getContext());
                             missingImage.setText(errorMsg);
 
@@ -173,8 +185,8 @@ public class ListWidget extends ItemsWidget implements MultiChoiceWidget, OnChec
                 // build text label. Don't assign the text to the built in label to he
                 // button because it aligns horizontally, and we want the label on top
                 TextView label = new TextView(getContext());
-                label.setText(questionDetails.getPrompt().getSelectChoiceText(items.get(i)));
-                label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, getAnswerFontSize());
+                label.setText(HtmlUtils.textToHtml(questionDetails.getPrompt().getSelectChoiceText(items.get(i))));
+                label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, QuestionFontSizeUtils.getFontSize(settings, QuestionFontSizeUtils.FontSize.HEADLINE_6));
                 label.setGravity(Gravity.CENTER_HORIZONTAL);
                 if (!displayLabel) {
                     label.setVisibility(View.GONE);
@@ -306,5 +318,9 @@ public class ListWidget extends ItemsWidget implements MultiChoiceWidget, OnChec
     @Override
     protected int getLayout() {
         return R.layout.label_widget;
+    }
+
+    public boolean shouldDisplayLabel() {
+        return displayLabel;
     }
 }

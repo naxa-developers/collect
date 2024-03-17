@@ -3,18 +3,19 @@ package org.odk.collect.android.fragments.dialogs;
 import android.content.DialogInterface;
 
 import androidx.fragment.app.FragmentManager;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.odk.collect.android.fragments.support.DialogFragmentHelpers;
 import org.odk.collect.android.logic.DatePickerDetails;
-import org.odk.collect.android.support.RobolectricHelpers;
-import org.robolectric.RobolectricTestRunner;
+import org.odk.collect.android.support.CollectHelpers;
+import org.odk.collect.testshared.RobolectricHelpers;
 
 import static org.mockito.Mockito.when;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class CopticDatePickerDialogTest {
     private FragmentManager fragmentManager;
     private CopticDatePickerDialog dialogFragment;
@@ -23,7 +24,7 @@ public class CopticDatePickerDialogTest {
 
     @Before
     public void setup() {
-        activity = RobolectricHelpers.createThemedActivity(DialogFragmentHelpers.DatePickerTestActivity.class);
+        activity = CollectHelpers.createThemedActivity(DialogFragmentHelpers.DatePickerTestActivity.class);
         fragmentManager = activity.getSupportFragmentManager();
 
         dialogFragment = new CopticDatePickerDialog();
@@ -34,13 +35,17 @@ public class CopticDatePickerDialogTest {
     @Test
     public void dialogIsCancellable() {
         dialogFragment.show(fragmentManager, "TAG");
+        RobolectricHelpers.runLooper();
+
         DialogFragmentHelpers.assertDialogIsCancellable(true);
     }
 
     @Test
     public void dialogShouldShowCorrectDate() {
         dialogFragment.show(fragmentManager, "TAG");
-        DialogFragmentHelpers.assertDialogShowsCorrectDate(1736, 8, 4, "4 Pashons 1736 (2020May12)");
+        RobolectricHelpers.runLooper();
+
+        DialogFragmentHelpers.assertDialogShowsCorrectDate(1736, 8, 4, "4 Pashons 1736 (May 12, 2020)");
     }
 
     @Test
@@ -48,6 +53,7 @@ public class CopticDatePickerDialogTest {
         when(datePickerDetails.isYearMode()).thenReturn(true);
         when(datePickerDetails.isSpinnerMode()).thenReturn(false);
         dialogFragment.show(fragmentManager, "TAG");
+        RobolectricHelpers.runLooper();
 
         DialogFragmentHelpers.assertDialogShowsCorrectDateForYearMode(1736, "1736 (2019)");
     }
@@ -57,36 +63,45 @@ public class CopticDatePickerDialogTest {
         when(datePickerDetails.isMonthYearMode()).thenReturn(true);
         when(datePickerDetails.isSpinnerMode()).thenReturn(false);
         dialogFragment.show(fragmentManager, "TAG");
+        RobolectricHelpers.runLooper();
 
-        DialogFragmentHelpers.assertDialogShowsCorrectDateForMonthMode(1736, 8, "Pashons 1736 (2020May)");
+        DialogFragmentHelpers.assertDialogShowsCorrectDateForMonthMode(1736, 8, "Pashons 1736 (May 2020)");
     }
 
     @Test
     public void settingDateInDatePicker_changesDateShownInTextView() {
         dialogFragment.show(fragmentManager, "TAG");
-        DialogFragmentHelpers.assertDialogTextViewUpdatesDate("4 Pashons 1736 (2020May12)");
+        RobolectricHelpers.runLooper();
+
+        DialogFragmentHelpers.assertDialogTextViewUpdatesDate("4 Pashons 1736 (May 12, 2020)", 1736, 8, 4);
     }
 
     @Test
     public void whenScreenIsRotated_dialogShouldRetainDateInDatePickerAndTextView() {
-        DialogFragmentHelpers.assertDialogRetainsDateOnScreenRotation(dialogFragment, "12 Meshir 2020 (2304Feb23)");
+        DialogFragmentHelpers.assertDialogRetainsDateOnScreenRotation(dialogFragment, "4 Pashons 1736 (May 12, 2020)", 1736, 8, 4);
     }
 
     @Test
     public void clickingOk_updatesDateInActivity() {
         dialogFragment.show(fragmentManager, "TAG");
-        DialogFragmentHelpers.assertDateUpdateInActivity(activity, 2304, 2, 23);
+        RobolectricHelpers.runLooper();
+
+        DialogFragmentHelpers.assertDateUpdateInActivity(activity, 1736, 8, 4);
     }
 
     @Test
     public void clickingOk_dismissesTheDialog() {
         dialogFragment.show(fragmentManager, "TAG");
+        RobolectricHelpers.runLooper();
+
         DialogFragmentHelpers.assertDialogIsDismissedOnButtonClick(DialogInterface.BUTTON_POSITIVE);
     }
 
     @Test
     public void clickingCancel_dismissesTheDialog() {
         dialogFragment.show(fragmentManager, "TAG");
+        RobolectricHelpers.runLooper();
+
         DialogFragmentHelpers.assertDialogIsDismissedOnButtonClick(DialogInterface.BUTTON_NEGATIVE);
     }
 }

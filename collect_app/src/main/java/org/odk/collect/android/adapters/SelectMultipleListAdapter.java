@@ -35,6 +35,8 @@ import org.odk.collect.android.audio.AudioHelper;
 import org.odk.collect.android.formentry.questions.AudioVideoImageTextLabel;
 import org.odk.collect.android.formentry.questions.NoButtonsItem;
 import org.odk.collect.android.listeners.SelectItemClickListener;
+import org.odk.collect.android.utilities.MediaUtils;
+import org.odk.collect.imageloader.GlideImageLoader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,12 +47,11 @@ public class SelectMultipleListAdapter extends AbstractSelectListAdapter {
     private final List<Selection> selectedItems;
     protected SelectItemClickListener listener;
 
-    @SuppressWarnings("PMD.ExcessiveParameterList")
     public SelectMultipleListAdapter(List<Selection> selectedItems, SelectItemClickListener listener,
                                      Context context, List<SelectChoice> items,
                                      FormEntryPrompt prompt, ReferenceManager referenceManager, AudioHelper audioHelper,
-                                     int playColor, int numColumns, boolean noButtonsMode) {
-        super(context, items, prompt, referenceManager, audioHelper, playColor, numColumns, noButtonsMode);
+                                     int playColor, int numColumns, boolean noButtonsMode, MediaUtils mediaUtils) {
+        super(context, items, prompt, referenceManager, audioHelper, playColor, numColumns, noButtonsMode, mediaUtils);
         this.originallySelectedItems = new ArrayList<>(selectedItems);
         this.selectedItems = selectedItems;
         this.listener = listener;
@@ -59,7 +60,7 @@ public class SelectMultipleListAdapter extends AbstractSelectListAdapter {
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         return new ViewHolder(noButtonsMode
-                ? new NoButtonsItem(context, !prompt.isReadOnly())
+                ? new NoButtonsItem(context, !prompt.isReadOnly(), new GlideImageLoader())
                 : new AudioVideoImageTextLabel(context));
     }
 
@@ -135,6 +136,10 @@ public class SelectMultipleListAdapter extends AbstractSelectListAdapter {
                 view.setBackground(ContextCompat.getDrawable(view.getContext(), R.drawable.select_item_border));
             }
             playAudio(selection.choice);
+        }
+
+        if (listener != null) {
+            listener.onItemClicked();
         }
     }
 

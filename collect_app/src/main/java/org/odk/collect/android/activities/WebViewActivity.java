@@ -16,6 +16,8 @@ package org.odk.collect.android.activities;
 
 import android.graphics.Bitmap;
 import android.os.Bundle;
+
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.widget.Toolbar;
 import android.view.View;
 import android.webkit.WebResourceError;
@@ -25,12 +27,24 @@ import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 
 import org.odk.collect.android.R;
-import org.odk.collect.android.utilities.CustomTabHelper;
+import org.odk.collect.android.utilities.ExternalWebPageHelper;
+import org.odk.collect.strings.localization.LocalizedActivity;
 
-public class WebViewActivity extends CollectAbstractActivity {
+public class WebViewActivity extends LocalizedActivity {
 
     private WebView webView;
     private ProgressBar progressBar;
+
+    private final OnBackPressedCallback onBackPressedCallback = new OnBackPressedCallback(true) {
+        @Override
+        public void handleOnBackPressed() {
+            if (webView.canGoBack()) {
+                webView.goBack();
+            } else {
+                finish();
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,9 +54,9 @@ public class WebViewActivity extends CollectAbstractActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setHomeAsUpIndicator(R.drawable.ic_close);
+        getSupportActionBar().setHomeAsUpIndicator(org.odk.collect.icons.R.drawable.ic_close);
 
-        String url = getIntent().getStringExtra(CustomTabHelper.OPEN_URL);
+        String url = getIntent().getStringExtra(ExternalWebPageHelper.OPEN_URL);
         webView = (WebView) findViewById(R.id.webView);
         progressBar = (ProgressBar) findViewById(R.id.progressBar);
 
@@ -80,20 +94,13 @@ public class WebViewActivity extends CollectAbstractActivity {
         webView.getSettings().setDisplayZoomControls(false);
         webView.setHorizontalScrollBarEnabled(false);
         webView.loadUrl(url);
+
+        getOnBackPressedDispatcher().addCallback(onBackPressedCallback);
     }
 
     @Override
     public boolean onSupportNavigateUp() {
         finish();
         return false;
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            finish();
-        }
     }
 }

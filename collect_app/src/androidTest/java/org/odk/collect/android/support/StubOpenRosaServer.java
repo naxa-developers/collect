@@ -1,10 +1,11 @@
 package org.odk.collect.android.support;
 
-import android.content.res.AssetManager;
+import static org.odk.collect.android.utilities.FileUtils.getResourceAsStream;
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.jetbrains.annotations.NotNull;
 import org.odk.collect.android.openrosa.CaseInsensitiveEmptyHeaders;
@@ -13,7 +14,12 @@ import org.odk.collect.android.openrosa.HttpCredentialsInterface;
 import org.odk.collect.android.openrosa.HttpGetResult;
 import org.odk.collect.android.openrosa.HttpHeadResult;
 import org.odk.collect.android.openrosa.HttpPostResult;
+import org.odk.collect.android.openrosa.OpenRosaConstants;
 import org.odk.collect.android.openrosa.OpenRosaHttpInterface;
+import org.odk.collect.android.utilities.FileUtils;
+import org.odk.collect.shared.TempFiles;
+import org.odk.collect.shared.strings.Md5;
+import org.odk.collect.shared.strings.RandomString;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -27,21 +33,20 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import static java.util.Arrays.asList;
-import static org.odk.collect.android.utilities.FileUtils.getMd5Hash;
-
 public class StubOpenRosaServer implements OpenRosaHttpInterface {
 
     private static final String HOST = "server.example.com";
 
-    private String formListPath = "/formList";
-    private String submissionPath = "/submission";
-
-    private final List<FormManifestEntry> forms = new ArrayList<>();
+    private final List<XFormItem> forms = new ArrayList<>();
     private String username;
     private String password;
     private boolean alwaysReturnError;
     private boolean fetchingFormsError;
+    private boolean noHashInFormList;
+    private boolean noHashPrefixInMediaFiles;
+    private boolean randomHash;
+
+    private final File submittedFormsDir = TempFiles.createTempDir();
 
     @NonNull
     @Override
@@ -54,7 +59,7 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
             return new HttpGetResult(null, new HashMap<>(), "Trying to connect to incorrect server: " + uri.getHost(), 410);
         } else if (credentialsIncorrect(credentials)) {
             return new HttpGetResult(null, new HashMap<>(), "", 401);
-        } else if (uri.getPath().equals(formListPath)) {
+        } else if (uri.getPath().equals(OpenRosaConstants.FORM_LIST)) {
             return new HttpGetResult(getFormListResponse(), getStandardHeaders(), "", 200);
         } else if (uri.getPath().equals("/form")) {
             if (fetchingFormsError) {
@@ -62,6 +67,16 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
             }
 
             return new HttpGetResult(getFormResponse(uri), getStandardHeaders(), "", 200);
+        } else if (uri.getPath().equals("/manifest")) {
+            InputStream manifestResponse = getManifestResponse(uri);
+
+            if (manifestResponse != null) {
+                return new HttpGetResult(manifestResponse, getStandardHeaders(), "", 200);
+            } else {
+                return new HttpGetResult(null, new HashMap<>(), "", 404);
+            }
+        } else if (uri.getPath().equals("/mediaFile")) {
+            return new HttpGetResult(getMediaFile(uri), new HashMap<>(), "", 200);
         } else {
             return new HttpGetResult(null, new HashMap<>(), "", 404);
         }
@@ -78,7 +93,7 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
             return new HttpHeadResult(410, new CaseInsensitiveEmptyHeaders());
         } else if (credentialsIncorrect(credentials)) {
             return new HttpHeadResult(401, new CaseInsensitiveEmptyHeaders());
-        } else if (uri.getPath().equals(submissionPath)) {
+        } else if (uri.getPath().equals(OpenRosaConstants.SUBMISSION)) {
             HashMap<String, String> headers = getStandardHeaders();
             headers.put("x-openrosa-accept-content-length", "10485760");
 
@@ -90,7 +105,7 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
 
     @NonNull
     @Override
-    public HttpPostResult uploadSubmissionFile(@NonNull List<File> fileList, @NonNull File submissionFile, @NonNull URI uri, @Nullable HttpCredentialsInterface credentials, @NonNull long contentLength) throws Exception {
+    public HttpPostResult uploadSubmissionAndFiles(@NonNull File submissionFile, @NonNull List<File> fileList, @NonNull URI uri, @Nullable HttpCredentialsInterface credentials, @NonNull long contentLength) throws Exception {
         if (alwaysReturnError) {
             return new HttpPostResult("", 500, "");
         }
@@ -99,19 +114,13 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
             return new HttpPostResult("Trying to connect to incorrect server: " + uri.getHost(), 410, "");
         } else if (credentialsIncorrect(credentials)) {
             return new HttpPostResult("", 401, "");
-        } else if (uri.getPath().equals(submissionPath)) {
+        } else if (uri.getPath().equals(OpenRosaConstants.SUBMISSION)) {
+            File destFile = new File(submittedFormsDir, String.valueOf(submittedFormsDir.listFiles().length));
+            FileUtils.copyFile(submissionFile, destFile);
             return new HttpPostResult("", 201, "");
         } else {
             return new HttpPostResult("", 404, "");
         }
-    }
-
-    public void setFormListPath(String path) {
-        formListPath = path;
-    }
-
-    public void setFormSubmissionPath(String path) {
-        submissionPath = path;
     }
 
     public void setCredentials(String username, String password) {
@@ -120,11 +129,15 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
     }
 
     public void addForm(String formLabel, String id, String version, String formXML) {
-        forms.add(new FormManifestEntry(formLabel, formXML, id, version));
+        forms.add(new XFormItem(formLabel, formXML, id, version));
+    }
+
+    public void addForm(String formLabel, String id, String version, String formXML, List<String> mediaFiles) {
+        forms.add(new XFormItem(formLabel, formXML, id, version, mediaFiles));
     }
 
     public void removeForm(String formLabel) {
-        forms.removeIf(formManifestEntry -> formManifestEntry.getFormLabel().equals(formLabel));
+        forms.removeIf(xFormItem -> xFormItem.getFormLabel().equals(formLabel));
     }
 
     public void alwaysReturnError() {
@@ -135,8 +148,28 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
         fetchingFormsError = true;
     }
 
+    public void removeHashInFormList() {
+        noHashInFormList = true;
+    }
+
+    public void removeMediaFileHashPrefix() {
+        noHashPrefixInMediaFiles = true;
+    }
+
+    public void returnRandomMediaFileHash() {
+        randomHash = true;
+    }
+
     public String getURL() {
         return "https://" + HOST;
+    }
+
+    public String getHostName() {
+        return HOST;
+    }
+
+    public List<File> getSubmissions() {
+        return asList(submittedFormsDir.listFiles());
     }
 
     private boolean credentialsIncorrect(HttpCredentialsInterface credentials) {
@@ -167,18 +200,26 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
                 .append("<xforms xmlns=\"http://openrosa.org/xforms/xformsList\">\n");
 
         for (int i = 0; i < forms.size(); i++) {
-            FormManifestEntry form = forms.get(i);
+            XFormItem form = forms.get(i);
 
-            String hash = getMd5Hash(getFormXML(String.valueOf(i)));
-
-            stringBuilder
+            StringBuilder xform = stringBuilder
                     .append("<xform>\n")
                     .append("<formID>" + form.getID() + "</formID>\n")
                     .append("<name>" + form.getFormLabel() + "</name>\n")
-                    .append("<version>" + form.getVersion() + "</version>\n")
-                    .append("<hash>md5:" + hash + "</hash>\n")
-                    .append("<downloadUrl>" + getURL() + "/form?formId=" + i + "</downloadUrl>\n")
-                    .append("</xform>\n");
+                    .append("<version>" + form.getVersion() + "</version>\n");
+
+            if (!noHashInFormList) {
+                String hash = Md5.getMd5Hash(getFormXML(String.valueOf(i)));
+                xform.append("<hash>md5:" + hash + "</hash>\n");
+            }
+
+            xform.append("<downloadUrl>" + getURL() + "/form?formId=" + i + "</downloadUrl>\n");
+
+            if (!form.getMediaFiles().isEmpty()) {
+                xform.append("<manifestUrl>" + getURL() + "/manifest?formId=" + i + "</manifestUrl>\n");
+            }
+
+            stringBuilder.append("</xform>\n");
         }
 
         stringBuilder.append("</xforms>");
@@ -191,26 +232,78 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
         return getFormXML(formID);
     }
 
+    @SuppressWarnings("PMD.ConsecutiveLiteralAppends")
+    private InputStream getManifestResponse(@NonNull URI uri) throws IOException {
+        String formID = uri.getQuery().split("=")[1];
+        XFormItem xformItem = forms.get(Integer.parseInt(formID));
+
+        if (xformItem.getMediaFiles().isEmpty()) {
+            return null;
+        } else {
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder
+                    .append("<?xml version='1.0' encoding='UTF-8' ?>\n")
+                    .append("<manifest xmlns=\"http://openrosa.org/xforms/xformsManifest\">\n");
+
+            for (String mediaFile : xformItem.getMediaFiles()) {
+                String mediaFileHash;
+
+                if (randomHash) {
+                    mediaFileHash = RandomString.randomString(8);
+                } else {
+                    mediaFileHash = Md5.getMd5Hash(getResourceAsStream("media/" + mediaFile));
+                }
+
+                stringBuilder
+                        .append("<mediaFile>")
+                        .append("<filename>" + mediaFile + "</filename>\n");
+
+                if (noHashPrefixInMediaFiles) {
+                    stringBuilder.append("<hash>" + mediaFileHash + " </hash>\n");
+                } else {
+                    stringBuilder.append("<hash>md5:" + mediaFileHash + " </hash>\n");
+                }
+
+                stringBuilder
+                        .append("<downloadUrl>" + getURL() + "/mediaFile?name=" + mediaFile + "</downloadUrl>\n")
+                        .append("</mediaFile>\n");
+            }
+
+            stringBuilder.append("</manifest>");
+            return new ByteArrayInputStream(stringBuilder.toString().getBytes());
+        }
+    }
+
     @NotNull
     private InputStream getFormXML(String formID) throws IOException {
         String xmlPath = forms.get(Integer.parseInt(formID)).getFormXML();
-
-        AssetManager assetManager = InstrumentationRegistry.getInstrumentation().getContext().getAssets();
-        return assetManager.open("forms/" + xmlPath);
+        return getResourceAsStream("forms/" + xmlPath);
     }
 
-    private static class FormManifestEntry {
+    @NotNull
+    private InputStream getMediaFile(URI uri) throws IOException {
+        String mediaFileName = uri.getQuery().split("=")[1];
+        return getResourceAsStream("media/" + mediaFileName);
+    }
+
+    private static class XFormItem {
 
         private final String formLabel;
         private final String formXML;
         private final String id;
         private final String version;
+        private final List<String> mediaFiles;
 
-        FormManifestEntry(String formLabel, String formXML, String id, String version) {
+        XFormItem(String formLabel, String formXML, String id, String version) {
+            this(formLabel, formXML, id, version, emptyList());
+        }
+
+        XFormItem(String formLabel, String formXML, String id, String version, List<String> mediaFiles) {
             this.formLabel = formLabel;
             this.formXML = formXML;
             this.id = id;
             this.version = version;
+            this.mediaFiles = mediaFiles;
         }
 
         public String getFormLabel() {
@@ -227,6 +320,10 @@ public class StubOpenRosaServer implements OpenRosaHttpInterface {
 
         public String getID() {
             return id;
+        }
+
+        public List<String> getMediaFiles() {
+            return mediaFiles;
         }
     }
 

@@ -9,7 +9,7 @@ import org.odk.collect.android.widgets.base.GeneralStringWidgetTest;
 
 import static junit.framework.TestCase.assertEquals;
 import static org.mockito.Mockito.when;
-import static org.odk.collect.android.utilities.WidgetAppearanceUtils.THOUSANDS_SEP;
+import static org.odk.collect.android.utilities.Appearances.THOUSANDS_SEP;
 
 /**
  * @author James Knight
@@ -19,7 +19,7 @@ public class IntegerWidgetTest extends GeneralStringWidgetTest<IntegerWidget, In
     @NonNull
     @Override
     public IntegerWidget createWidget() {
-        return new IntegerWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID", readOnlyOverride));
+        return new IntegerWidget(activity, new QuestionDetails(formEntryPrompt, readOnlyOverride));
     }
 
     @NonNull
@@ -34,14 +34,17 @@ public class IntegerWidgetTest extends GeneralStringWidgetTest<IntegerWidget, In
 
     @Test
     public void digitsAboveLimitOfNineShouldBeTruncatedFromRight() {
-        getWidget().answerText.setText("123456789123");
+        getWidget().widgetAnswerText.setAnswer("123456789123");
         assertEquals("123456789", getWidget().getAnswerText());
     }
 
     @Test
     public void separatorsShouldBeAddedWhenEnabled() {
         when(formEntryPrompt.getAppearanceHint()).thenReturn(THOUSANDS_SEP);
-        getWidget().answerText.setText("123456789");
-        assertEquals("123,456,789", getWidget().answerText.getText().toString());
+        getWidget().widgetAnswerText.setAnswer("123456789");
+
+        assertEquals("123,456,789", getWidget().widgetAnswerText.getAnswer());
+        assertEquals("123,456,789", getWidget().widgetAnswerText.getBinding().editText.getText().toString());
+        assertEquals("123,456,789", getWidget().widgetAnswerText.getBinding().textView.getText().toString());
     }
 }

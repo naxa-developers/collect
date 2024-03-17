@@ -4,9 +4,8 @@ import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
 
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.FragmentActivity;
 
-import org.javarosa.core.model.FormIndex;
 import org.joda.time.DateTime;
 import org.joda.time.LocalDateTime;
 import org.joda.time.chrono.CopticChronology;
@@ -14,7 +13,6 @@ import org.joda.time.chrono.EthiopicChronology;
 import org.joda.time.chrono.IslamicChronology;
 import org.joda.time.chrono.PersianChronologyKhayyamBorkowski;
 import org.odk.collect.android.R;
-import org.odk.collect.android.application.Collect;
 import org.odk.collect.android.fragments.dialogs.BikramSambatDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.CopticDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.CustomTimePickerDialog;
@@ -23,12 +21,11 @@ import org.odk.collect.android.fragments.dialogs.FixedDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.IslamicDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.MyanmarDatePickerDialog;
 import org.odk.collect.android.fragments.dialogs.PersianDatePickerDialog;
-import org.odk.collect.android.javarosawrapper.FormController;
 import org.odk.collect.android.logic.DatePickerDetails;
-import org.odk.collect.android.utilities.DialogUtils;
+import org.odk.collect.android.utilities.Appearances;
 import org.odk.collect.android.utilities.MyanmarDateUtils;
 import org.odk.collect.android.utilities.ThemeUtils;
-import org.odk.collect.android.utilities.WidgetAppearanceUtils;
+import org.odk.collect.androidshared.ui.DialogFragmentUtils;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -50,43 +47,36 @@ public class DateTimeWidgetUtils {
     public static final String DIALOG_THEME = "dialog_theme";
     public static final String DATE_PICKER_DETAILS = "date_picker_details";
 
-    public static void setWidgetWaitingForData(FormIndex formIndex) {
-        FormController formController = Collect.getInstance().getFormController();
-        if (formController != null) {
-            formController.setIndexWaitingForData(formIndex);
-        }
-    }
-
     public static DatePickerDetails getDatePickerDetails(String appearance) {
         DatePickerDetails.DatePickerType datePickerType = DatePickerDetails.DatePickerType.GREGORIAN;
         DatePickerDetails.DatePickerMode datePickerMode = DatePickerDetails.DatePickerMode.CALENDAR;
         if (appearance != null) {
             appearance = appearance.toLowerCase(Locale.US);
-            if (appearance.contains(WidgetAppearanceUtils.ETHIOPIAN)) {
+            if (appearance.contains(Appearances.ETHIOPIAN)) {
                 datePickerType = DatePickerDetails.DatePickerType.ETHIOPIAN;
                 datePickerMode = DatePickerDetails.DatePickerMode.SPINNERS;
-            } else if (appearance.contains(WidgetAppearanceUtils.COPTIC)) {
+            } else if (appearance.contains(Appearances.COPTIC)) {
                 datePickerType = DatePickerDetails.DatePickerType.COPTIC;
                 datePickerMode = DatePickerDetails.DatePickerMode.SPINNERS;
-            } else if (appearance.contains(WidgetAppearanceUtils.ISLAMIC)) {
+            } else if (appearance.contains(Appearances.ISLAMIC)) {
                 datePickerType = DatePickerDetails.DatePickerType.ISLAMIC;
                 datePickerMode = DatePickerDetails.DatePickerMode.SPINNERS;
-            } else if (appearance.contains(WidgetAppearanceUtils.BIKRAM_SAMBAT)) {
+            } else if (appearance.contains(Appearances.BIKRAM_SAMBAT)) {
                 datePickerType = DatePickerDetails.DatePickerType.BIKRAM_SAMBAT;
                 datePickerMode = DatePickerDetails.DatePickerMode.SPINNERS;
-            } else if (appearance.contains(WidgetAppearanceUtils.MYANMAR)) {
+            } else if (appearance.contains(Appearances.MYANMAR)) {
                 datePickerType = DatePickerDetails.DatePickerType.MYANMAR;
                 datePickerMode = DatePickerDetails.DatePickerMode.SPINNERS;
-            } else if (appearance.contains(WidgetAppearanceUtils.PERSIAN)) {
+            } else if (appearance.contains(Appearances.PERSIAN)) {
                 datePickerType = DatePickerDetails.DatePickerType.PERSIAN;
                 datePickerMode = DatePickerDetails.DatePickerMode.SPINNERS;
-            } else if (appearance.contains(WidgetAppearanceUtils.NO_CALENDAR)) {
+            } else if (appearance.contains(Appearances.NO_CALENDAR)) {
                 datePickerMode = DatePickerDetails.DatePickerMode.SPINNERS;
             }
 
-            if (appearance.contains(WidgetAppearanceUtils.MONTH_YEAR)) {
+            if (appearance.contains(Appearances.MONTH_YEAR)) {
                 datePickerMode = DatePickerDetails.DatePickerMode.MONTH_YEAR;
-            } else if (appearance.contains(WidgetAppearanceUtils.YEAR)) {
+            } else if (appearance.contains(Appearances.YEAR)) {
                 datePickerMode = DatePickerDetails.DatePickerMode.YEAR;
             }
         }
@@ -117,7 +107,7 @@ public class DateTimeWidgetUtils {
                 break;
             case BIKRAM_SAMBAT:
                 customDate = new DateTime(date);
-                monthArray = BsCalendar.MONTH_NAMES.toArray(new String[BsCalendar.MONTH_NAMES.size()]);
+                monthArray = BsCalendar.MONTH_NAMES.toArray(new String[0]);
                 break;
             case MYANMAR:
                 customDate = new DateTime(date);
@@ -186,17 +176,17 @@ public class DateTimeWidgetUtils {
                 }
         }
 
-        return String.format(context.getString(R.string.custom_date), customDateText, gregorianDateText);
+        return String.format(context.getString(org.odk.collect.strings.R.string.custom_date), customDateText, gregorianDateText);
     }
 
     public void showTimePickerDialog(Context context, LocalDateTime dateTime) {
         ThemeUtils themeUtils = new ThemeUtils(context);
 
         Bundle bundle = new Bundle();
-        bundle.putInt(DIALOG_THEME, themeUtils.getHoloDialogTheme());
+        bundle.putInt(DIALOG_THEME, themeUtils.getSpinnerTimePickerDialogTheme());
         bundle.putSerializable(TIME, dateTime);
 
-        DialogUtils.showIfNotShowing(CustomTimePickerDialog.class, bundle, ((AppCompatActivity) context).getSupportFragmentManager());
+        DialogFragmentUtils.showIfNotShowing(CustomTimePickerDialog.class, bundle, ((FragmentActivity) context).getSupportFragmentManager());
     }
 
     public void showDatePickerDialog(Context context, DatePickerDetails datePickerDetails, LocalDateTime date) {
@@ -207,7 +197,7 @@ public class DateTimeWidgetUtils {
         bundle.putSerializable(DATE, date);
         bundle.putSerializable(DATE_PICKER_DETAILS, datePickerDetails);
 
-        DialogUtils.showIfNotShowing(getClass(datePickerDetails.getDatePickerType()), bundle, ((AppCompatActivity) context).getSupportFragmentManager());
+        DialogFragmentUtils.showIfNotShowing(getClass(datePickerDetails.getDatePickerType()), bundle, ((FragmentActivity) context).getSupportFragmentManager());
     }
 
     private static Class getClass(DatePickerDetails.DatePickerType datePickerType) {
@@ -232,10 +222,10 @@ public class DateTimeWidgetUtils {
     private static int getDatePickerTheme(ThemeUtils themeUtils, DatePickerDetails datePickerDetails) {
         int theme = 0;
         if (!isBrokenSamsungDevice()) {
-            theme = themeUtils.getMaterialDialogTheme();
+            theme = themeUtils.getCalendarDatePickerDialogTheme();
         }
         if (!datePickerDetails.isCalendarMode() || isBrokenSamsungDevice()) {
-            theme = themeUtils.getHoloDialogTheme();
+            theme = themeUtils.getSpinnerDatePickerDialogTheme();
         }
 
         return theme;

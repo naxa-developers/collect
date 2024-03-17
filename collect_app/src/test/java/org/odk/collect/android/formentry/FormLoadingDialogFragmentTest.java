@@ -1,34 +1,27 @@
 package org.odk.collect.android.formentry;
 
-import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.Robolectric;
-import org.robolectric.RobolectricTestRunner;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.robolectric.Shadows.shadowOf;
 
-@RunWith(RobolectricTestRunner.class)
+import androidx.fragment.app.testing.FragmentScenario;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.odk.collect.fragmentstest.FragmentScenarioLauncherRule;
+
+@RunWith(AndroidJUnit4.class)
 public class FormLoadingDialogFragmentTest {
 
-    private FragmentManager fragmentManager;
-
-    @Before
-    public void setup() {
-        FragmentActivity activity = Robolectric.setupActivity(FragmentActivity.class);
-        fragmentManager = activity.getSupportFragmentManager();
-    }
+    @Rule
+    public FragmentScenarioLauncherRule launcherRule = new FragmentScenarioLauncherRule();
 
     @Test
     public void dialogIsNotCancellable() {
-        FormLoadingDialogFragment fragment = new FormLoadingDialogFragment();
-        fragment.show(fragmentManager, "TAG");
-
-        assertThat(shadowOf(fragment.getDialog()).isCancelable(), equalTo(false));
+        FragmentScenario<FormLoadingDialogFragment> fragmentScenario = launcherRule.launch(FormLoadingDialogFragment.class);
+        fragmentScenario.onFragment(fragment -> {
+            assertThat(fragment.isCancelable(), equalTo(false));
+        });
     }
 }

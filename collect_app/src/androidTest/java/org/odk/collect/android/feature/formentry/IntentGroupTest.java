@@ -16,53 +16,53 @@
 
 package org.odk.collect.android.feature.formentry;
 
-import android.Manifest;
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.intent.Intents.intending;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.isInternal;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.isEnabled;
+import static androidx.test.espresso.matcher.ViewMatchers.withClassName;
+import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withTagValue;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static org.hamcrest.CoreMatchers.allOf;
+import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.core.StringEndsWith.endsWith;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.odk.collect.android.support.matchers.CustomMatchers.withIndex;
+import static org.odk.collect.android.utilities.FileUtils.copyFileFromResources;
+
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 
 import androidx.core.content.FileProvider;
-import androidx.test.rule.ActivityTestRule;
-import androidx.test.rule.GrantPermissionRule;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.espresso.matcher.ViewMatchers;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.odk.collect.android.BuildConfig;
 import org.odk.collect.android.R;
-import org.odk.collect.android.activities.FormEntryActivity;
 import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.FormLoadingUtils;
-import org.odk.collect.android.support.ResetStateRule;
+import org.odk.collect.android.support.rules.BlankFormTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
+import org.odk.collect.androidtest.RecordedIntentsRule;
 
 import java.io.File;
 import java.io.IOException;
-
-import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.action.ViewActions.click;
-import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
-import static androidx.test.espresso.assertion.ViewAssertions.matches;
-import static androidx.test.espresso.intent.Intents.intending;
-import static androidx.test.espresso.intent.matcher.IntentMatchers.isInternal;
-import static androidx.test.espresso.matcher.RootMatchers.withDecorView;
-import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static androidx.test.espresso.matcher.ViewMatchers.isEnabled;
-import static androidx.test.espresso.matcher.ViewMatchers.withClassName;
-import static androidx.test.espresso.matcher.ViewMatchers.withId;
-import static androidx.test.espresso.matcher.ViewMatchers.withTagValue;
-import static androidx.test.espresso.matcher.ViewMatchers.withText;
-import static org.hamcrest.CoreMatchers.not;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.core.StringEndsWith.endsWith;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.odk.collect.android.support.CustomMatchers.withIndex;
-import static org.odk.collect.android.support.FileUtils.copyFileFromAssets;
-import static org.odk.collect.android.support.actions.NestedScrollToAction.nestedScrollTo;
 
 /**
  * Tests that intent groups work as documented at https://docs.getodk.org/launch-apps-from-collect/#launching-external-apps-to-populate-multiple-fields
@@ -70,22 +70,17 @@ import static org.odk.collect.android.support.actions.NestedScrollToAction.neste
 public class IntentGroupTest {
     private static final String INTENT_GROUP_FORM = "intent-group.xml";
 
-    public ActivityTestRule<FormEntryActivity> activityTestRule = FormLoadingUtils.getFormActivityTestRuleFor(INTENT_GROUP_FORM);
+    public BlankFormTestRule rule = new BlankFormTestRule(INTENT_GROUP_FORM, "intent-group");
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ))
-            .around(new ResetStateRule())
-            .around(new CopyFormRule(INTENT_GROUP_FORM, true))
-            .around(activityTestRule);
+    public RuleChain copyFormChain = TestRuleChain.chain()
+            .around(new RecordedIntentsRule())
+            .around(rule);
 
     // Verifies that a value given to the label text with form buttonText is used as the button text.
     @Test
     public void buttonName_ShouldComeFromSpecialFormText() {
-        onView(withText(R.string.launch_app)).check(doesNotExist());
+        onView(withText(org.odk.collect.strings.R.string.launch_app)).check(doesNotExist());
         onView(withText("This is buttonText")).check(matches(isDisplayed()));
     }
 
@@ -93,8 +88,9 @@ public class IntentGroupTest {
     // text if no app is found.
     @Test
     public void appMissingErrorText_ShouldComeFromSpecialFormText() {
-        onView(withText("This is buttonText")).perform(click());
-        onView(withText("This is noAppErrorString")).inRoot(withDecorView(not(activityTestRule.getActivity().getWindow().getDecorView()))).check(matches(isDisplayed()));
+        rule.startInFormEntry()
+                .clickOnText("This is buttonText")
+                .checkIsToastWithMessageDisplayed("This is noAppErrorString");
     }
 
     @Test
@@ -128,7 +124,7 @@ public class IntentGroupTest {
         resultIntent.setClipData(clipData);
         resultIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intending(not(isInternal())).respondWith(new Instrumentation.ActivityResult(Activity.RESULT_OK, resultIntent));
-        onView(withText("This is buttonText")).perform(nestedScrollTo(), click());
+        onView(withText("This is buttonText")).perform(scrollTo(), click());
 
         assertImageWidgetWithAnswer();
         assertAudioWidgetWithAnswer();
@@ -162,7 +158,7 @@ public class IntentGroupTest {
         resultIntent.setClipData(clipData);
         resultIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intending(not(isInternal())).respondWith(new Instrumentation.ActivityResult(Activity.RESULT_OK, resultIntent));
-        onView(withText("This is buttonText")).perform(nestedScrollTo(), click());
+        onView(withText("This is buttonText")).perform(scrollTo(), click());
 
         onView(withIndex(withClassName(endsWith("EditText")), 0)).check(matches(withText("")));
         onView(withIndex(withClassName(endsWith("EditText")), 1)).check(matches(withText("")));
@@ -181,7 +177,7 @@ public class IntentGroupTest {
         Intent resultIntent = new Intent();
 
         Uri uri = mock(Uri.class);
-        when(uri.getScheme()).thenThrow(new SecurityException());
+        when(uri.getScheme()).thenThrow(new RuntimeException());
 
         resultIntent.putExtra("questionImage", uri);
 
@@ -211,9 +207,9 @@ public class IntentGroupTest {
     }
 
     private void assertImageWidgetWithoutAnswer() {
-        onView(withTagValue(is("ImageView"))).check(doesNotExist());
-        onView(withId(R.id.capture_image)).check(doesNotExist());
-        onView(withId(R.id.choose_image)).check(doesNotExist());
+        onView(allOf(withTagValue(is("ImageView")), withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE))).check(doesNotExist());
+        onView(withId(R.id.capture_button)).check(matches(not(isDisplayed())));
+        onView(withId(R.id.choose_button)).check(matches(not(isDisplayed())));
     }
 
     private void assertAudioWidgetWithoutAnswer() {
@@ -221,8 +217,8 @@ public class IntentGroupTest {
     }
 
     private void assertVideoWidgetWithoutAnswer() {
-        onView(withText(is("Video external"))).perform(nestedScrollTo()).check(matches(isDisplayed()));
-        onView(withId(R.id.play_video)).check(matches(not(isDisplayed())));
+        onView(withText(is("Video external"))).perform(scrollTo()).check(matches(isDisplayed()));
+        onView(withId(R.id.play_video_button)).check(matches(not(isDisplayed())));
     }
 
     private void assertFileWidgetWithoutAnswer() {
@@ -230,28 +226,32 @@ public class IntentGroupTest {
     }
 
     private void assertImageWidgetWithAnswer() {
-        onView(withTagValue(is("ImageView"))).perform(nestedScrollTo()).check(matches(isDisplayed()));
-        onView(withId(R.id.capture_image)).check(doesNotExist());
-        onView(withId(R.id.choose_image)).check(doesNotExist());
+        onView(allOf(withTagValue(is("ImageView")), withEffectiveVisibility(ViewMatchers.Visibility.VISIBLE))).check(matches(not(doesNotExist())));
+        onView(withId(R.id.capture_button)).check(matches(not(isDisplayed())));
+        onView(withId(R.id.choose_button)).check(matches(not(isDisplayed())));
     }
 
     private void assertAudioWidgetWithAnswer() {
-        onView(withId(R.id.audio_controller)).perform(nestedScrollTo()).check(matches(isDisplayed()));
+        onView(withId(R.id.audio_controller)).perform(scrollTo()).check(matches(isDisplayed()));
     }
 
     private void assertVideoWidgetWithAnswer() {
-        onView(withId(R.id.play_video)).perform(nestedScrollTo()).check(matches(isDisplayed()));
-        onView(withId(R.id.play_video)).check(matches(isEnabled()));
+        onView(withId(R.id.play_video_button)).perform(scrollTo()).check(matches(isDisplayed()));
+        onView(withId(R.id.play_video_button)).check(matches(isEnabled()));
     }
 
     private void assertFileWidgetWithAnswer() {
-        onView(withTagValue(is("ArbitraryFileWidgetAnswer"))).perform(nestedScrollTo()).check(matches(isDisplayed()));
+        onView(withTagValue(is("ArbitraryFileWidgetAnswer"))).perform(scrollTo()).check(matches(isDisplayed()));
     }
 
-    @SuppressWarnings("PMD.DoNotHardCodeSDCard")
     private Uri createTempFile(String name, String extension) throws IOException {
-        File file = File.createTempFile(name, extension, new File("/sdcard"));
-        copyFileFromAssets("media" + File.separator + name + "." + extension, file.getPath());
+        // Use the phones downloads dir for temp files
+        File downloadsDir = ApplicationProvider
+                .getApplicationContext()
+                .getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+
+        File file = File.createTempFile(name, extension, downloadsDir);
+        copyFileFromResources("media" + File.separator + name + "." + extension, file.getPath());
         return getUriForFile(file);
     }
 

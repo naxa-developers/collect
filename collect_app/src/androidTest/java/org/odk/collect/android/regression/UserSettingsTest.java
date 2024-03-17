@@ -6,9 +6,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.R;
-import org.odk.collect.android.support.CollectTestRule;
-import org.odk.collect.android.support.ResetStateRule;
+import org.odk.collect.android.support.rules.CollectTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
 import org.odk.collect.android.support.pages.MainMenuPage;
 
 //Issue NODK-241
@@ -18,19 +17,19 @@ public class UserSettingsTest {
     public CollectTestRule rule = new CollectTestRule();
 
     @Rule
-    public RuleChain ruleChain = RuleChain
-            .outerRule(new ResetStateRule())
+    public RuleChain ruleChain = TestRuleChain.chain()
             .around(rule);
 
     @Test
     public void typeOption_ShouldNotBeVisible() {
         //TestCase1
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickAdminSettings()
+        new MainMenuPage()
+                .openProjectSettingsDialog()
+                .clickSettings()
+                .clickAccessControl()
                 .openUserSettings()
                 .assertTextDoesNotExist("Type")
                 .assertTextDoesNotExist("Submission transport")
-                .assertText(R.string.server_settings_title);
+                .assertText(org.odk.collect.strings.R.string.server_settings_title);
     }
 }

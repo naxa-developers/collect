@@ -5,20 +5,20 @@ import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.view.View;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
 import org.javarosa.core.model.FormIndex;
 import org.javarosa.core.model.data.StringData;
 import org.javarosa.form.api.FormEntryPrompt;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.R;
 import org.odk.collect.android.activities.BearingActivity;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.listeners.WidgetValueChangedListener;
-import org.odk.collect.android.support.TestScreenContextActivity;
+import org.odk.collect.android.support.WidgetTestActivity;
 import org.odk.collect.android.utilities.ApplicationConstants;
 import org.odk.collect.android.widgets.support.FakeWaitingForDataRegistry;
-import org.robolectric.RobolectricTestRunner;
 import org.robolectric.shadows.ShadowActivity;
 import org.robolectric.shadows.ShadowToast;
 
@@ -37,11 +37,11 @@ import static org.robolectric.Shadows.shadowOf;
 /**
  * @author James Knight
  */
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class BearingWidgetTest {
     private final FakeWaitingForDataRegistry fakeWaitingForDataRegistry = new FakeWaitingForDataRegistry();
 
-    private TestScreenContextActivity widgetActivity;
+    private WidgetTestActivity widgetActivity;
     private ShadowActivity shadowActivity;
     private SensorManager sensorManager;
     private View.OnLongClickListener listener;
@@ -67,18 +67,18 @@ public class BearingWidgetTest {
     @Test
     public void whenPromptDoesNotHaveAnswer_getBearingButtonIsShown() {
         assertThat(createWidget(promptWithAnswer(null)).binding.bearingButton.getText(),
-                is(widgetActivity.getString(R.string.get_bearing)));
+                is(widgetActivity.getString(org.odk.collect.strings.R.string.get_bearing)));
     }
 
     @Test
     public void whenPromptHasAnswer_replaceBearingButtonIsShown() {
         assertThat(createWidget(promptWithAnswer(new StringData("blah"))).binding.bearingButton.getText(),
-                is(widgetActivity.getString(R.string.replace_bearing)));
+                is(widgetActivity.getString(org.odk.collect.strings.R.string.replace_bearing)));
     }
 
     @Test
     public void whenPromptHasAnswer_answerTextViewShowsCorrectAnswer() {
-        assertThat(createWidget(promptWithAnswer(new StringData("blah"))).binding.answerText.getText().toString(), is("blah"));
+        assertThat(createWidget(promptWithAnswer(new StringData("blah"))).binding.widgetAnswerText.getAnswer(), is("blah"));
     }
 
     @Test
@@ -95,14 +95,14 @@ public class BearingWidgetTest {
     public void clearAnswer_clearsWidgetAnswer() {
         BearingWidget widget = createWidget(promptWithAnswer(new StringData("blah")));
         widget.clearAnswer();
-        assertThat(widget.binding.answerText.getText().toString(), is(""));
+        assertThat(widget.binding.widgetAnswerText.getAnswer(), is(""));
     }
 
     @Test
     public void clearAnswer_updatesButtonLabel() {
         BearingWidget widget = createWidget(promptWithAnswer(new StringData("blah")));
         widget.clearAnswer();
-        assertThat(widget.binding.bearingButton.getText(), is(widgetActivity.getString(R.string.get_bearing)));
+        assertThat(widget.binding.bearingButton.getText(), is(widgetActivity.getString(org.odk.collect.strings.R.string.get_bearing)));
     }
 
     @Test
@@ -118,14 +118,14 @@ public class BearingWidgetTest {
     public void setData_updatesWidgetAnswer() {
         BearingWidget widget = createWidget(promptWithAnswer(null));
         widget.setData("blah");
-        assertThat(widget.binding.answerText.getText().toString(), is("blah"));
+        assertThat(widget.binding.widgetAnswerText.getAnswer(), is("blah"));
     }
 
     @Test
     public void setData_updatesButtonLabel() {
         BearingWidget widget = createWidget(promptWithAnswer(null));
         widget.setData("blah");
-        assertThat(widget.binding.bearingButton.getText(), is(widgetActivity.getString(R.string.replace_bearing)));
+        assertThat(widget.binding.bearingButton.getText(), is(widgetActivity.getString(org.odk.collect.strings.R.string.replace_bearing)));
     }
 
     @Test
@@ -142,8 +142,8 @@ public class BearingWidgetTest {
         BearingWidget widget = createWidget(promptWithAnswer(null));
         widget.setOnLongClickListener(listener);
 
-        widget.binding.answerText.performLongClick();
-        verify(listener).onLongClick(widget.binding.answerText);
+        widget.binding.widgetAnswerText.performLongClick();
+        verify(listener).onLongClick(widget.binding.widgetAnswerText);
     }
 
     @Test
@@ -215,7 +215,7 @@ public class BearingWidgetTest {
     }
 
     private BearingWidget createWidget(FormEntryPrompt prompt) {
-        return new BearingWidget(widgetActivity, new QuestionDetails(prompt, "formAnalyticsID"), fakeWaitingForDataRegistry, sensorManager);
+        return new BearingWidget(widgetActivity, new QuestionDetails(prompt), fakeWaitingForDataRegistry, sensorManager);
     }
 
     private void assertNoIntentLaunchedWhenSensorIsUnavailable(int sensorType) {
@@ -224,7 +224,7 @@ public class BearingWidgetTest {
         widget.binding.bearingButton.performClick();
 
         assertThat(shadowActivity.getNextStartedActivity(), nullValue());
-        assertThat(ShadowToast.getTextOfLatestToast(), is(widgetActivity.getString(R.string.bearing_lack_of_sensors)));
+        assertThat(ShadowToast.getTextOfLatestToast(), is(widgetActivity.getString(org.odk.collect.strings.R.string.bearing_lack_of_sensors)));
     }
 
     private void assertAnswerTextIsEditableWhenSensorIsUnavailable(int sensorType) {
@@ -232,8 +232,7 @@ public class BearingWidgetTest {
         BearingWidget widget = createWidget(promptWithAnswer(null));
         widget.binding.bearingButton.performClick();
 
-        assertThat(widget.binding.answerText.didTouchFocusSelect(), is(true));
-        assertThat(widget.binding.answerText.hasFocusable(), is(true));
+        assertThat(widget.binding.widgetAnswerText.isEditableState(), is(true));
     }
 
     private void assertBearingButtonIsDisabledWhenSensorIsUnavailable(int sensorType) {

@@ -2,6 +2,8 @@ package org.odk.collect.android.formentry.backgroundlocation;
 
 import android.location.Location;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -11,10 +13,9 @@ import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.odk.collect.android.formentry.audit.AuditConfig;
-import org.odk.collect.android.location.LocationTestUtils;
+import org.odk.collect.testshared.LocationTestUtils;
 import org.odk.collect.android.location.client.FakeLocationClient;
 import org.odk.collect.android.formentry.audit.AuditEvent;
-import org.robolectric.RobolectricTestRunner;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -25,7 +26,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public class BackgroundLocationManagerTest {
     @Rule
     public MockitoRule rule = MockitoJUnit.rule();
@@ -43,7 +44,7 @@ public class BackgroundLocationManagerTest {
     }
 
     /**
-     * activityDisplayed is called from both onStart and loadingComplete in FormEntryActivity. This
+     * activityDisplayed is called from both onStart and loadingComplete in FormFillingActivity. This
      * test confirms that it doesn't matter how many times activityDisplayed is called until the
      * form has been loaded.
      */
@@ -444,16 +445,16 @@ public class BackgroundLocationManagerTest {
         backgroundLocationManager.activityHidden();
         backgroundLocationManager.activityDisplayed();
 
-        // not possible through FormEntryActivity because menu doesn't show toggle
+        // not possible through FormFillingActivity because menu doesn't show toggle
         backgroundLocationManager.backgroundLocationPreferenceToggled();
 
-        // not possible through FormEntryActivity because provider not registered
+        // not possible through FormFillingActivity because provider not registered
         backgroundLocationManager.locationProvidersChanged();
 
-        // not possible through FormEntryActivity because listener not set
+        // not possible through FormFillingActivity because listener not set
         backgroundLocationManager.onLocationChanged(LocationTestUtils.createLocation("GPS", 1, 2, 3, 4));
 
-        // not possible through FormEntryActivity because location request never needed
+        // not possible through FormFillingActivity because location request never needed
         backgroundLocationManager.locationPermissionGranted();
         backgroundLocationManager.locationPermissionDenied();
 

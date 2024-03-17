@@ -1,9 +1,5 @@
 package org.odk.collect.android.support.pages;
 
-import androidx.test.rule.ActivityTestRule;
-
-import org.odk.collect.android.R;
-
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.pressImeActionButton;
@@ -18,35 +14,35 @@ public class IdentifyUserPromptPage extends Page<IdentifyUserPromptPage> {
 
     private final String formName;
 
-    public IdentifyUserPromptPage(String formName, ActivityTestRule rule) {
-        super(rule);
+    public IdentifyUserPromptPage(String formName) {
+        super();
         this.formName = formName;
     }
 
     @Override
     public IdentifyUserPromptPage assertOnPage() {
         assertToolbarTitle(formName);
-        onView(withText(getTranslatedString(R.string.enter_identity))).check(matches(isDisplayed()));
+        onView(withText(getTranslatedString(org.odk.collect.strings.R.string.enter_identity))).check(matches(isDisplayed()));
         return this;
     }
 
     public IdentifyUserPromptPage enterIdentity(String identity) {
-        onView(withHint(getTranslatedString(R.string.identity))).perform(replaceText(identity));
+        onView(withHint(getTranslatedString(org.odk.collect.strings.R.string.identity))).perform(replaceText(identity));
         return this;
     }
 
-    public FormEntryPage clickKeyboardEnter() {
-        onView(withHint(getTranslatedString(R.string.identity))).perform(pressImeActionButton());
-        return new FormEntryPage(formName, rule).assertOnPage();
+    public <D extends Page<D>> D clickKeyboardEnter(D destination) {
+        onView(withHint(getTranslatedString(org.odk.collect.strings.R.string.identity))).perform(pressImeActionButton());
+        return destination.assertOnPage();
     }
 
     public IdentifyUserPromptPage clickKeyboardEnterWithValidationError() {
-        onView(withHint(getTranslatedString(R.string.identity))).perform(pressImeActionButton());
+        onView(withHint(getTranslatedString(org.odk.collect.strings.R.string.identity))).perform(pressImeActionButton());
         return this.assertOnPage();
     }
 
     public MainMenuPage pressClose() {
-        onView(withContentDescription(getTranslatedString(R.string.close))).perform(click());
-        return new MainMenuPage(rule).assertOnPage();
+        onView(withContentDescription(getTranslatedString(org.odk.collect.strings.R.string.close))).perform(click());
+        return new MainMenuPage().assertOnPage();
     }
 }

@@ -11,6 +11,10 @@
             android:title="@string/server_settings_title"
             app:iconSpaceReserved="false" />
         <CheckBoxPreference
+            android:key="change_project_display"
+            android:title="@string/project_display_title"
+            app:iconSpaceReserved="false" />
+        <CheckBoxPreference
             android:key="change_app_theme"
             android:title="@string/app_theme"
             app:iconSpaceReserved="false" />
@@ -25,10 +29,6 @@
         <CheckBoxPreference
             android:key="change_navigation"
             android:title="@string/navigation"
-            app:iconSpaceReserved="false" />
-        <CheckBoxPreference
-            android:key="show_splash_screen"
-            android:title="@string/show_splash_title"
             app:iconSpaceReserved="false" />
         <CheckBoxPreference
             android:key="maps"
@@ -57,10 +57,6 @@
         <CheckBoxPreference
             android:key="delete_after_send"
             android:title="@string/delete_after_send"
-            app:iconSpaceReserved="false" />
-        <CheckBoxPreference
-            android:key="default_to_finalized"
-            android:title="@string/default_completed"
             app:iconSpaceReserved="false" />
         <CheckBoxPreference
             android:key="change_constraint_behavior"

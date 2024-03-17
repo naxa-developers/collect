@@ -19,13 +19,14 @@ package org.odk.collect.android.fragments.dialogs;
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
-import androidx.fragment.app.DialogFragment;
-import androidx.appcompat.app.AlertDialog;
-import androidx.lifecycle.ViewModelProvider;
-
 import android.view.View;
 import android.widget.NumberPicker;
 import android.widget.TextView;
+
+import androidx.fragment.app.DialogFragment;
+import androidx.lifecycle.ViewModelProvider;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.joda.time.LocalDateTime;
 import org.odk.collect.android.R;
@@ -74,15 +75,15 @@ public abstract class CustomDatePickerDialog extends DialogFragment {
 
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
-        return new AlertDialog.Builder(getActivity())
-                .setTitle(R.string.select_date)
+        return new MaterialAlertDialogBuilder(getActivity())
+                .setTitle(org.odk.collect.strings.R.string.select_date)
                 .setView(R.layout.custom_date_picker_dialog)
-                .setPositiveButton(R.string.ok, (dialog, id) -> {
+                .setPositiveButton(org.odk.collect.strings.R.string.ok, (dialog, id) -> {
                     LocalDateTime date = DateTimeUtils.getDateAsGregorian(getOriginalDate());
                     viewModel.setSelectedDate(date.getYear(), date.getMonthOfYear() - 1, date.getDayOfMonth());
                     dismiss();
                 })
-                .setNegativeButton(R.string.cancel, (dialog, id) -> dismiss())
+                .setNegativeButton(org.odk.collect.strings.R.string.cancel, (dialog, id) -> dismiss())
                 .create();
     }
 

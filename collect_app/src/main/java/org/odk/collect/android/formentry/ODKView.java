@@ -14,8 +14,10 @@
 
 package org.odk.collect.android.formentry;
 
-import android.animation.ArgbEvaluator;
-import android.animation.ValueAnimator;
+import static org.odk.collect.android.injection.DaggerUtils.getComponent;
+import static org.odk.collect.android.utilities.ApplicationConstants.RequestCodes;
+import static org.odk.collect.settings.keys.ProjectKeys.KEY_EXTERNAL_APP_RECORDING;
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -27,10 +29,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.text.TextUtils;
 import android.util.TypedValue;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnLongClickListener;
-import android.widget.FrameLayout;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -38,6 +39,7 @@ import android.widget.Toast;
 import androidx.activity.ComponentActivity;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.widget.NestedScrollView;
 import androidx.lifecycle.LifecycleOwner;
 
 import com.google.android.material.button.MaterialButton;
@@ -52,36 +54,41 @@ import org.javarosa.core.reference.ReferenceManager;
 import org.javarosa.form.api.FormEntryCaption;
 import org.javarosa.form.api.FormEntryPrompt;
 import org.odk.collect.android.R;
-import org.odk.collect.android.analytics.Analytics;
+import org.odk.collect.android.activities.FormFillingActivity;
 import org.odk.collect.android.application.Collect;
 import org.odk.collect.android.audio.AudioHelper;
-import org.odk.collect.android.dao.helpers.ContentResolverHelper;
 import org.odk.collect.android.exception.ExternalParamsException;
 import org.odk.collect.android.exception.JavaRosaException;
-import org.odk.collect.android.external.ExternalAppsUtils;
-import org.odk.collect.android.formentry.media.AudioHelperFactory;
+import org.odk.collect.android.dynamicpreload.ExternalAppsUtils;
 import org.odk.collect.android.formentry.media.PromptAutoplayer;
-import org.odk.collect.android.formentry.questions.QuestionTextSizeHelper;
 import org.odk.collect.android.javarosawrapper.FormController;
 import org.odk.collect.android.listeners.WidgetValueChangedListener;
-import org.odk.collect.android.preferences.PreferencesProvider;
-import org.odk.collect.android.utilities.ActivityAvailability;
+import org.odk.collect.android.utilities.ContentUriHelper;
+import org.odk.collect.android.utilities.ExternalAppIntentProvider;
 import org.odk.collect.android.utilities.FileUtils;
-import org.odk.collect.android.utilities.PermissionUtils;
-import org.odk.collect.android.utilities.QuestionFontSizeUtils;
+import org.odk.collect.android.utilities.HtmlUtils;
 import org.odk.collect.android.utilities.QuestionMediaManager;
 import org.odk.collect.android.utilities.ScreenContext;
 import org.odk.collect.android.utilities.ThemeUtils;
-import org.odk.collect.android.utilities.ToastUtils;
 import org.odk.collect.android.widgets.QuestionWidget;
 import org.odk.collect.android.widgets.StringWidget;
 import org.odk.collect.android.widgets.WidgetFactory;
 import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
 import org.odk.collect.android.widgets.utilities.AudioPlayer;
-import org.odk.collect.android.widgets.utilities.RecordingRequesterFactory;
+import org.odk.collect.android.widgets.utilities.ExternalAppRecordingRequester;
+import org.odk.collect.android.widgets.utilities.FileRequesterImpl;
+import org.odk.collect.android.widgets.utilities.InternalRecordingRequester;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
+import org.odk.collect.android.widgets.utilities.RecordingRequesterProvider;
+import org.odk.collect.android.widgets.utilities.StringRequesterImpl;
 import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
+import org.odk.collect.androidshared.system.IntentLauncher;
+import org.odk.collect.androidshared.ui.ToastUtils;
 import org.odk.collect.audioclips.PlaybackFailedException;
-import org.odk.collect.audiorecorder.recording.AudioRecorderViewModel;
+import org.odk.collect.audiorecorder.recording.AudioRecorder;
+import org.odk.collect.permissions.PermissionListener;
+import org.odk.collect.permissions.PermissionsProvider;
+import org.odk.collect.settings.SettingsProvider;
 
 import java.io.File;
 import java.io.Serializable;
@@ -96,56 +103,64 @@ import javax.inject.Inject;
 
 import timber.log.Timber;
 
-import static org.odk.collect.android.injection.DaggerUtils.getComponent;
-import static org.odk.collect.android.preferences.GeneralKeys.KEY_EXTERNAL_APP_RECORDING;
-import static org.odk.collect.android.utilities.ApplicationConstants.RequestCodes;
-
 /**
  * Contains either one {@link QuestionWidget} if the current form element is a question or
  * multiple {@link QuestionWidget}s if the current form element is a group with the
  * {@code field-list} appearance.
  */
 @SuppressLint("ViewConstructor")
-public class ODKView extends FrameLayout implements OnLongClickListener, WidgetValueChangedListener {
+public class ODKView extends SwipeHandler.View implements OnLongClickListener, WidgetValueChangedListener {
 
     private final LinearLayout widgetsList;
     private final LinearLayout.LayoutParams layout;
     private final ArrayList<QuestionWidget> widgets;
     private final AudioHelper audioHelper;
 
-    public static final String FIELD_LIST = "field-list";
-
     private WidgetValueChangedListener widgetValueChangedListener;
 
     @Inject
-    public AudioHelperFactory audioHelperFactory;
+    PermissionsProvider permissionsProvider;
 
     @Inject
-    public Analytics analytics;
+    SettingsProvider settingsProvider;
 
     @Inject
-    PreferencesProvider preferencesProvider;
+    ExternalAppIntentProvider externalAppIntentProvider;
 
     @Inject
-    ActivityAvailability activityAvailability;
+    IntentLauncher intentLauncher;
 
     private final WidgetFactory widgetFactory;
     private final LifecycleOwner viewLifecycle;
+    private final FormController formController;
 
     /**
      * Builds the view for a specified question or field-list of questions.
-     *
      * @param context         the activity creating this view
      * @param questionPrompts the questions to be included in this view
      * @param groups          the group hierarchy that this question or field list is in
      * @param advancingPage   whether this view is being created after a forward swipe through the
      */
-    public ODKView(ComponentActivity context, final FormEntryPrompt[] questionPrompts, FormEntryCaption[] groups, boolean advancingPage, QuestionMediaManager questionMediaManager, WaitingForDataRegistry waitingForDataRegistry, AudioPlayer audioPlayer, AudioRecorderViewModel audioRecorderViewModel) {
+    public ODKView(
+            ComponentActivity context,
+            final FormEntryPrompt[] questionPrompts,
+            FormEntryCaption[] groups,
+            boolean advancingPage,
+            QuestionMediaManager questionMediaManager,
+            WaitingForDataRegistry waitingForDataRegistry,
+            AudioPlayer audioPlayer,
+            AudioRecorder audioRecorder,
+            FormEntryViewModel formEntryViewModel,
+            PrinterWidgetViewModel printerWidgetViewModel,
+            InternalRecordingRequester internalRecordingRequester,
+            ExternalAppRecordingRequester externalAppRecordingRequester,
+            AudioHelper audioHelper
+    ) {
         super(context);
         viewLifecycle = ((ScreenContext) context).getViewLifecycle();
 
         getComponent(context).inject(this);
-        this.audioHelper = audioHelperFactory.create(context);
+        this.audioHelper = audioHelper;
         inflate(getContext(), R.layout.odk_view, this); // keep in an xml file to enable the vertical scrollbar
 
         // when the grouped fields are populated by an external app, this will get true.
@@ -162,18 +177,27 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
             }
         }
 
-        PermissionUtils permissionUtils = new PermissionUtils(R.style.Theme_Collect_Dialog_PermissionAlert);
+        formController = formEntryViewModel.getFormController();
 
         this.widgetFactory = new WidgetFactory(
                 context,
                 readOnlyOverride,
-                preferencesProvider.getGeneralSharedPreferences().getBoolean(KEY_EXTERNAL_APP_RECORDING, true),
+                settingsProvider.getUnprotectedSettings().getBoolean(KEY_EXTERNAL_APP_RECORDING),
                 waitingForDataRegistry,
                 questionMediaManager,
-                analytics,
                 audioPlayer,
-                activityAvailability,
-                new RecordingRequesterFactory(waitingForDataRegistry, questionMediaManager, activityAvailability, audioRecorderViewModel, permissionUtils, context, viewLifecycle)
+                new RecordingRequesterProvider(
+                        internalRecordingRequester,
+                        externalAppRecordingRequester
+                ),
+                formEntryViewModel,
+                printerWidgetViewModel,
+                audioRecorder,
+                viewLifecycle,
+                new FileRequesterImpl(intentLauncher, externalAppIntentProvider, formController),
+                new StringRequesterImpl(intentLauncher, externalAppIntentProvider, formController),
+                formController,
+                (FormFillingActivity) context
         );
 
         widgets = new ArrayList<>();
@@ -198,7 +222,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
                 final PlaybackFailedException playbackFailedException = (PlaybackFailedException) e;
                 Toast.makeText(
                         getContext(),
-                        getContext().getString(playbackFailedException.getExceptionMsg() == 0 ? R.string.file_missing : R.string.file_invalid, playbackFailedException.getURI()),
+                        getContext().getString(playbackFailedException.getExceptionMsg() == 0 ? org.odk.collect.strings.R.string.file_missing : org.odk.collect.strings.R.string.file_invalid, playbackFailedException.getURI()),
                         Toast.LENGTH_SHORT
                 ).show();
 
@@ -225,9 +249,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
     private Boolean autoplayAudio(FormEntryPrompt firstPrompt) {
         PromptAutoplayer promptAutoplayer = new PromptAutoplayer(
                 audioHelper,
-                ReferenceManager.instance(),
-                analytics,
-                Collect.getCurrentFormIdentifierHash()
+                ReferenceManager.instance()
         );
 
         return promptAutoplayer.autoplayIfNeeded(firstPrompt);
@@ -291,7 +313,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
      * Note: if the given question is of an unsupported type, a text widget will be created.
      */
     private QuestionWidget configureWidgetForQuestion(FormEntryPrompt question) {
-        QuestionWidget qw = widgetFactory.createWidgetFromPrompt(question);
+        QuestionWidget qw = widgetFactory.createWidgetFromPrompt(question, permissionsProvider);
         qw.setOnLongClickListener(this);
         qw.setValueChangedListener(this);
 
@@ -302,6 +324,14 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
         View divider = new View(getContext());
         divider.setBackgroundResource(new ThemeUtils(getContext()).getDivider());
         divider.setMinimumHeight(3);
+
+        ViewGroup.MarginLayoutParams params = new ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        );
+        int marginVertical = (int) getContext().getResources().getDimension(org.odk.collect.androidshared.R.dimen.margin_extra_small);
+        params.setMargins(0, marginVertical, 0, marginVertical);
+        divider.setLayoutParams(params);
 
         return divider;
     }
@@ -327,14 +357,14 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
      * Add a TextView containing the hierarchy of groups to which the question belongs.
      */
     private void setGroupText(FormEntryCaption[] groups) {
-        String path = getGroupsPath(groups);
+        CharSequence path = getGroupsPath(groups);
 
-        if (!path.isEmpty()) {
+        if (path.length() > 0) {
             TextView tv = findViewById(R.id.group_text);
             tv.setText(path);
 
-            QuestionTextSizeHelper textSizeHelper = new QuestionTextSizeHelper();
-            tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, textSizeHelper.getSubtitle1());
+            int fontSize = QuestionFontSizeUtils.getFontSize(settingsProvider.getUnprotectedSettings(), QuestionFontSizeUtils.FontSize.SUBTITLE_1);
+            tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, fontSize);
 
             tv.setVisibility(VISIBLE);
         }
@@ -344,7 +374,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
      * @see #getGroupsPath(FormEntryCaption[], boolean)
      */
     @NonNull
-    public static String getGroupsPath(FormEntryCaption[] groups) {
+    public static CharSequence getGroupsPath(FormEntryCaption[] groups) {
         return getGroupsPath(groups, false);
     }
 
@@ -356,7 +386,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
      * i.e. show `Friends` instead of `Friends > 1`.
      */
     @NonNull
-    public static String getGroupsPath(FormEntryCaption[] groups, boolean hideLastMultiplicity) {
+    public static CharSequence getGroupsPath(FormEntryCaption[] groups, boolean hideLastMultiplicity) {
         if (groups == null) {
             return "";
         }
@@ -378,7 +408,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
             index++;
         }
 
-        return TextUtils.join(" > ", segments);
+        return HtmlUtils.textToHtml(TextUtils.join(" > ", segments));
     }
 
     /**
@@ -390,9 +420,9 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
         final String buttonText;
         final String errorString;
         String v = c.getSpecialFormQuestionText("buttonText");
-        buttonText = (v != null) ? v : context.getString(R.string.launch_app);
+        buttonText = (v != null) ? v : context.getString(org.odk.collect.strings.R.string.launch_app);
         v = c.getSpecialFormQuestionText("noAppErrorString");
-        errorString = (v != null) ? v : context.getString(R.string.no_app);
+        errorString = (v != null) ? v : context.getString(org.odk.collect.strings.R.string.no_app);
 
         // set button formatting
         MaterialButton launchIntentButton = findViewById(R.id.launchIntentButton);
@@ -416,7 +446,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
 
             try {
                 ExternalAppsUtils.populateParameters(i, parameters,
-                        c.getIndex().getReference());
+                        c.getIndex().getReference(), formController);
 
                 for (FormEntryPrompt p : questionPrompts) {
                     IFormElement formElement = p.getFormElement();
@@ -442,11 +472,11 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
             } catch (ExternalParamsException e) {
                 Timber.e(e, "ExternalParamsException");
 
-                ToastUtils.showShortToast(e.getMessage());
+                ToastUtils.showShortToast(getContext(), e.getMessage());
             } catch (ActivityNotFoundException e) {
                 Timber.d(e, "ActivityNotFoundExcept");
 
-                ToastUtils.showShortToast(errorString);
+                ToastUtils.showShortToast(getContext(), errorString);
             }
         });
     }
@@ -466,7 +496,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
         return qw.getLocalVisibleRect(scrollBounds);
     }
 
-    public void scrollTo(@Nullable QuestionWidget qw) {
+    public void scrollToTopOf(@Nullable QuestionWidget qw) {
         if (qw != null && widgets.contains(qw)) {
             findViewById(R.id.odk_view_container).scrollTo(0, qw.getTop());
         }
@@ -476,10 +506,7 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
      * Saves answers for the widgets in this view. Called when the widgets are in an intent group.
      */
     public void setDataForFields(Bundle bundle) throws JavaRosaException {
-        FormController formController = Collect.getInstance().getFormController();
-        if (formController == null) {
-            return;
-        }
+
 
         if (bundle != null) {
             Set<String> keys = bundle.keySet();
@@ -523,21 +550,25 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
                                     } else {
                                         throw new RuntimeException("The value for " + key + " must be a URI but it is " + answer);
                                     }
-                                    
-                                    if (uri != null) {
-                                        File destFile = FileUtils.createDestinationMediaFile(formController.getInstanceFile().getParent(), ContentResolverHelper.getFileExtensionFromUri(getContext(), uri));
-                                        //TODO might be better to use QuestionMediaManager in the future
-                                        FileUtils.saveAnswerFileFromUri(uri, destFile, getContext());
-                                        ((WidgetDataReceiver) questionWidget).setData(destFile);
-                                    }
-                                    questionWidget.showAnswerContainer();
+
+                                    permissionsProvider.requestReadUriPermission((Activity) getContext(), uri, getContext().getContentResolver(), new PermissionListener() {
+                                        @Override
+                                        public void granted() {
+                                            File destFile = FileUtils.createDestinationMediaFile(formController.getInstanceFile().getParent(), ContentUriHelper.getFileExtensionFromUri(uri));
+                                            //TODO might be better to use QuestionMediaManager in the future
+                                            FileUtils.saveAnswerFileFromUri(uri, destFile, getContext());
+                                            ((WidgetDataReceiver) questionWidget).setData(destFile);
+
+                                            questionWidget.showAnswerContainer();
+                                        }
+                                    });
                                 } catch (Exception | Error e) {
                                     Timber.w(e);
                                 }
                                 break;
                             default:
                                 throw new RuntimeException(
-                                        getContext().getString(R.string.ext_assign_value_error,
+                                        getContext().getString(org.odk.collect.strings.R.string.ext_assign_value_error,
                                                 treeReference.toString(false)));
                         }
                         break;
@@ -547,14 +578,20 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
         }
     }
 
-    public boolean suppressFlingGesture(MotionEvent e1, MotionEvent e2, float velocityX,
-                                        float velocityY) {
+    @Override
+    public boolean shouldSuppressFlingGesture() {
         for (QuestionWidget q : widgets) {
-            if (q.suppressFlingGesture(e1, e2, velocityX, velocityY)) {
+            if (q.shouldSuppressFlingGesture()) {
                 return true;
             }
         }
         return false;
+    }
+
+    @Nullable
+    @Override
+    public NestedScrollView verticalScrollView() {
+        return findViewById(R.id.odk_view_container);
     }
 
     /**
@@ -596,37 +633,20 @@ public class ODKView extends FrameLayout implements OnLongClickListener, WidgetV
         }
     }
 
-    /**
-     * Highlights the question at the given {@link FormIndex} in red for 2.5 seconds, scrolls the
-     * view to display that question at the top and gives it focus.
-     */
-    public void highlightWidget(FormIndex formIndex) {
-        QuestionWidget qw = getQuestionWidget(formIndex);
-
-        if (qw != null) {
-            // postDelayed is needed because otherwise scrolling may not work as expected in case when
-            // answers are validated during form finalization.
-            new Handler().postDelayed(() -> {
-                qw.setFocus(getContext());
-                scrollTo(qw);
-
-                ValueAnimator va = new ValueAnimator();
-                va.setIntValues(getResources().getColor(R.color.red_500), getDrawingCacheBackgroundColor());
-                va.setEvaluator(new ArgbEvaluator());
-                va.addUpdateListener(valueAnimator -> qw.setBackgroundColor((int) valueAnimator.getAnimatedValue()));
-                va.setDuration(2500);
-                va.start();
-            }, 100);
-        }
-    }
-
-    private QuestionWidget getQuestionWidget(FormIndex formIndex) {
-        for (QuestionWidget qw : widgets) {
-            if (formIndex.equals(qw.getFormEntryPrompt().getIndex())) {
-                return qw;
+    public void setErrorForQuestionWithIndex(FormIndex formIndex, String errorMessage) {
+        for (QuestionWidget questionWidget : getWidgets()) {
+            if (formIndex.equals(questionWidget.getFormEntryPrompt().getIndex())) {
+                questionWidget.displayError(errorMessage);
+                // postDelayed is needed because otherwise scrolling may not work as expected in case when
+                // answers are validated during form finalization.
+                postDelayed(() -> {
+                    questionWidget.setFocus(getContext());
+                    scrollToTopOf(questionWidget);
+                }, 400);
+            } else {
+                questionWidget.hideError();
             }
         }
-        return null;
     }
 
     /**

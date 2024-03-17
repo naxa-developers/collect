@@ -3,69 +3,93 @@ package org.odk.collect.android.injection.config;
 import android.app.Application;
 
 import org.javarosa.core.reference.ReferenceManager;
-import org.odk.collect.android.activities.DeleteSavedFormActivity;
-import org.odk.collect.android.activities.FillBlankFormActivity;
+import org.odk.collect.android.activities.AboutActivity;
+import org.odk.collect.android.activities.AppListActivity;
+import org.odk.collect.android.activities.DeleteFormsActivity;
+import org.odk.collect.android.activities.FirstLaunchActivity;
 import org.odk.collect.android.activities.FormDownloadListActivity;
-import org.odk.collect.android.activities.FormEntryActivity;
-import org.odk.collect.android.activities.FormHierarchyActivity;
+import org.odk.collect.android.activities.FormFillingActivity;
 import org.odk.collect.android.activities.FormMapActivity;
-import org.odk.collect.android.activities.GeoPointMapActivity;
-import org.odk.collect.android.activities.GeoPolyActivity;
-import org.odk.collect.android.activities.InstanceUploaderActivity;
-import org.odk.collect.android.activities.InstanceUploaderListActivity;
-import org.odk.collect.android.activities.MainMenuActivity;
-import org.odk.collect.android.activities.SplashScreenActivity;
-import org.odk.collect.android.adapters.InstanceUploaderAdapter;
-import org.odk.collect.android.analytics.Analytics;
+import org.odk.collect.android.activities.InstanceChooserList;
 import org.odk.collect.android.application.Collect;
 import org.odk.collect.android.application.initialization.ApplicationInitializer;
+import org.odk.collect.android.application.initialization.ExistingProjectMigrator;
 import org.odk.collect.android.audio.AudioRecordingControllerFragment;
+import org.odk.collect.android.audio.AudioRecordingErrorDialogFragment;
 import org.odk.collect.android.backgroundwork.AutoSendTaskSpec;
 import org.odk.collect.android.backgroundwork.AutoUpdateTaskSpec;
 import org.odk.collect.android.backgroundwork.SyncFormsTaskSpec;
-import org.odk.collect.android.configure.SettingsImporter;
 import org.odk.collect.android.configure.qr.QRCodeScannerFragment;
 import org.odk.collect.android.configure.qr.QRCodeTabsActivity;
 import org.odk.collect.android.configure.qr.ShowQRCodeFragment;
+import org.odk.collect.android.entities.EntitiesRepositoryProvider;
+import org.odk.collect.android.external.AndroidShortcutsActivity;
+import org.odk.collect.android.external.FormUriActivity;
+import org.odk.collect.android.external.FormsProvider;
+import org.odk.collect.android.external.InstanceProvider;
+import org.odk.collect.android.formentry.BackgroundAudioPermissionDialogFragment;
 import org.odk.collect.android.formentry.ODKView;
-import org.odk.collect.android.formentry.QuitFormDialogFragment;
+import org.odk.collect.android.formentry.repeats.DeleteRepeatDialogFragment;
 import org.odk.collect.android.formentry.saving.SaveAnswerFileErrorDialogFragment;
 import org.odk.collect.android.formentry.saving.SaveFormProgressDialogFragment;
+import org.odk.collect.android.formhierarchy.FormHierarchyActivity;
+import org.odk.collect.android.formlists.blankformlist.BlankFormListActivity;
+import org.odk.collect.android.formmanagement.FormSourceProvider;
+import org.odk.collect.android.formmanagement.FormsDataService;
 import org.odk.collect.android.fragments.BarCodeScannerFragment;
-import org.odk.collect.android.fragments.BlankFormListFragment;
-import org.odk.collect.android.fragments.MapBoxInitializationFragment;
-import org.odk.collect.android.fragments.SavedFormListFragment;
+import org.odk.collect.android.fragments.dialogs.FormsDownloadResultDialog;
 import org.odk.collect.android.fragments.dialogs.SelectMinimalDialog;
-import org.odk.collect.android.gdrive.GoogleDriveActivity;
-import org.odk.collect.android.gdrive.GoogleSheetsUploaderActivity;
-import org.odk.collect.android.geo.GoogleMapFragment;
-import org.odk.collect.android.geo.MapboxMapFragment;
-import org.odk.collect.android.geo.OsmDroidMapFragment;
-import org.odk.collect.android.logic.PropertyManager;
+import org.odk.collect.android.instancemanagement.send.InstanceUploaderActivity;
+import org.odk.collect.android.instancemanagement.send.InstanceUploaderListActivity;
+import org.odk.collect.android.mainmenu.MainMenuActivity;
 import org.odk.collect.android.openrosa.OpenRosaHttpInterface;
-import org.odk.collect.android.preferences.AdminPasswordDialogFragment;
-import org.odk.collect.android.preferences.AdminPreferencesFragment;
-import org.odk.collect.android.preferences.AdminSharedPreferences;
-import org.odk.collect.android.preferences.BasePreferenceFragment;
-import org.odk.collect.android.preferences.ExperimentalPreferencesFragment;
-import org.odk.collect.android.preferences.FormManagementPreferences;
-import org.odk.collect.android.preferences.FormMetadataFragment;
-import org.odk.collect.android.preferences.GeneralPreferencesFragment;
-import org.odk.collect.android.preferences.GeneralSharedPreferences;
-import org.odk.collect.android.preferences.IdentityPreferences;
-import org.odk.collect.android.preferences.PreferencesActivity;
-import org.odk.collect.android.preferences.PreferencesProvider;
-import org.odk.collect.android.preferences.ServerAuthDialogFragment;
-import org.odk.collect.android.preferences.ServerPreferencesFragment;
-import org.odk.collect.android.preferences.UserInterfacePreferencesFragment;
-import org.odk.collect.android.storage.StorageInitializer;
-import org.odk.collect.android.storage.migration.StorageMigrationDialog;
-import org.odk.collect.android.storage.migration.StorageMigrationService;
+import org.odk.collect.android.preferences.CaptionedListPreference;
+import org.odk.collect.android.preferences.dialogs.AdminPasswordDialogFragment;
+import org.odk.collect.android.preferences.dialogs.ChangeAdminPasswordDialog;
+import org.odk.collect.android.preferences.dialogs.ResetDialogPreferenceFragmentCompat;
+import org.odk.collect.android.preferences.dialogs.ServerAuthDialogFragment;
+import org.odk.collect.android.preferences.screens.BaseAdminPreferencesFragment;
+import org.odk.collect.android.preferences.screens.BasePreferencesFragment;
+import org.odk.collect.android.preferences.screens.BaseProjectPreferencesFragment;
+import org.odk.collect.android.preferences.screens.ExperimentalPreferencesFragment;
+import org.odk.collect.android.preferences.screens.FormManagementPreferencesFragment;
+import org.odk.collect.android.preferences.screens.FormMetadataPreferencesFragment;
+import org.odk.collect.android.preferences.screens.IdentityPreferencesFragment;
+import org.odk.collect.android.preferences.screens.MapsPreferencesFragment;
+import org.odk.collect.android.preferences.screens.ProjectDisplayPreferencesFragment;
+import org.odk.collect.android.preferences.screens.ProjectManagementPreferencesFragment;
+import org.odk.collect.android.preferences.screens.ProjectPreferencesActivity;
+import org.odk.collect.android.preferences.screens.ProjectPreferencesFragment;
+import org.odk.collect.android.preferences.screens.ServerPreferencesFragment;
+import org.odk.collect.android.preferences.screens.UserInterfacePreferencesFragment;
+import org.odk.collect.android.projects.ManualProjectCreatorDialog;
+import org.odk.collect.android.projects.ProjectSettingsDialog;
+import org.odk.collect.android.projects.ProjectsDataService;
+import org.odk.collect.android.projects.QrCodeProjectCreatorDialog;
+import org.odk.collect.android.storage.StoragePathProvider;
+import org.odk.collect.android.tasks.DownloadFormListTask;
 import org.odk.collect.android.tasks.InstanceServerUploaderTask;
-import org.odk.collect.android.utilities.ApplicationResetter;
+import org.odk.collect.android.tasks.MediaLoadingTask;
+import org.odk.collect.android.upload.InstanceUploader;
 import org.odk.collect.android.utilities.AuthDialogUtility;
-import org.odk.collect.android.widgets.ExStringWidget;
+import org.odk.collect.android.utilities.FormsRepositoryProvider;
+import org.odk.collect.android.utilities.InstancesRepositoryProvider;
+import org.odk.collect.android.utilities.ProjectResetter;
+import org.odk.collect.android.utilities.ThemeUtils;
 import org.odk.collect.android.widgets.QuestionWidget;
+import org.odk.collect.android.widgets.items.SelectOneFromMapDialogFragment;
+import org.odk.collect.androidshared.network.NetworkStateProvider;
+import org.odk.collect.async.Scheduler;
+import org.odk.collect.draw.DrawActivity;
+import org.odk.collect.googlemaps.GoogleMapFragment;
+import org.odk.collect.location.LocationClient;
+import org.odk.collect.maps.MapFragmentFactory;
+import org.odk.collect.maps.layers.ReferenceLayerRepository;
+import org.odk.collect.permissions.PermissionsChecker;
+import org.odk.collect.permissions.PermissionsProvider;
+import org.odk.collect.projects.ProjectsRepository;
+import org.odk.collect.settings.ODKAppSettingsImporter;
+import org.odk.collect.settings.SettingsProvider;
 
 import javax.inject.Singleton;
 
@@ -76,18 +100,18 @@ import dagger.Component;
  * Dagger component for the application. Should include
  * application level Dagger Modules and be built with Application
  * object.
- *
+ * <p>
  * Add an `inject(MyClass myClass)` method here for objects you want
  * to inject into so Dagger knows to wire it up.
- *
+ * <p>
  * Annotated with @Singleton so modules can include @Singletons that will
  * be retained at an application level (as this an instance of this components
  * is owned by the Application object).
- *
+ * <p>
  * If you need to call a provider directly from the component (in a test
  * for example) you can add a method with the type you are looking to fetch
  * (`MyType myType()`) to this interface.
- *
+ * <p>
  * To read more about Dagger visit: https://google.github.io/dagger/users-guide
  **/
 
@@ -110,17 +134,17 @@ public interface AppDependencyComponent {
 
     void inject(Collect collect);
 
-    void inject(InstanceUploaderAdapter instanceUploaderAdapter);
+    void inject(AboutActivity aboutActivity);
 
-    void inject(SavedFormListFragment savedFormListFragment);
-
-    void inject(PropertyManager propertyManager);
-
-    void inject(FormEntryActivity formEntryActivity);
+    void inject(FormFillingActivity formFillingActivity);
 
     void inject(InstanceServerUploaderTask uploader);
 
     void inject(ServerPreferencesFragment serverPreferencesFragment);
+
+    void inject(ProjectDisplayPreferencesFragment projectDisplayPreferencesFragment);
+
+    void inject(ProjectManagementPreferencesFragment projectManagementPreferencesFragment);
 
     void inject(AuthDialogUtility authDialogUtility);
 
@@ -128,29 +152,15 @@ public interface AppDependencyComponent {
 
     void inject(InstanceUploaderListActivity activity);
 
-    void inject(GoogleDriveActivity googleDriveActivity);
-
-    void inject(GoogleSheetsUploaderActivity googleSheetsUploaderActivity);
-
     void inject(QuestionWidget questionWidget);
-
-    void inject(ExStringWidget exStringWidget);
 
     void inject(ODKView odkView);
 
-    void inject(FormMetadataFragment formMetadataFragment);
-
-    void inject(GeoPointMapActivity geoMapActivity);
-
-    void inject(GeoPolyActivity geoPolyActivity);
+    void inject(FormMetadataPreferencesFragment formMetadataPreferencesFragment);
 
     void inject(FormMapActivity formMapActivity);
 
-    void inject(OsmDroidMapFragment mapFragment);
-
     void inject(GoogleMapFragment mapFragment);
-
-    void inject(MapboxMapFragment mapFragment);
 
     void inject(MainMenuActivity mainMenuActivity);
 
@@ -158,41 +168,27 @@ public interface AppDependencyComponent {
 
     void inject(ShowQRCodeFragment showQRCodeFragment);
 
-    void inject(StorageInitializer storageInitializer);
-
-    void inject(StorageMigrationService storageMigrationService);
-
     void inject(AutoSendTaskSpec autoSendTaskSpec);
-
-    void inject(StorageMigrationDialog storageMigrationDialog);
 
     void inject(AdminPasswordDialogFragment adminPasswordDialogFragment);
 
-    void inject(SplashScreenActivity splashScreenActivity);
-
     void inject(FormHierarchyActivity formHierarchyActivity);
 
-    void inject(FormManagementPreferences formManagementPreferences);
+    void inject(FormManagementPreferencesFragment formManagementPreferencesFragment);
 
-    void inject(IdentityPreferences identityPreferences);
+    void inject(IdentityPreferencesFragment identityPreferencesFragment);
 
     void inject(UserInterfacePreferencesFragment userInterfacePreferencesFragment);
 
     void inject(SaveFormProgressDialogFragment saveFormProgressDialogFragment);
 
-    void inject(QuitFormDialogFragment quitFormDialogFragment);
-
     void inject(BarCodeScannerFragment barCodeScannerFragment);
 
     void inject(QRCodeScannerFragment qrCodeScannerFragment);
 
-    void inject(PreferencesActivity preferencesActivity);
+    void inject(ProjectPreferencesActivity projectPreferencesActivity);
 
-    void inject(ApplicationResetter applicationResetter);
-
-    void inject(FillBlankFormActivity fillBlankFormActivity);
-
-    void inject(MapBoxInitializationFragment mapBoxInitializationFragment);
+    void inject(ResetDialogPreferenceFragmentCompat resetDialogPreferenceFragmentCompat);
 
     void inject(SyncFormsTaskSpec syncWork);
 
@@ -202,17 +198,13 @@ public interface AppDependencyComponent {
 
     void inject(ServerAuthDialogFragment serverAuthDialogFragment);
 
-    void inject(BasePreferenceFragment basePreferenceFragment);
-
-    void inject(BlankFormListFragment blankFormListFragment);
+    void inject(BasePreferencesFragment basePreferencesFragment);
 
     void inject(InstanceUploaderActivity instanceUploaderActivity);
 
-    void inject(GeneralPreferencesFragment generalPreferencesFragment);
+    void inject(ProjectPreferencesFragment projectPreferencesFragment);
 
-    void inject(DeleteSavedFormActivity deleteSavedFormActivity);
-
-    void inject(AdminPreferencesFragment.MainMenuAccessPreferences mainMenuAccessPreferences);
+    void inject(DeleteFormsActivity deleteFormsActivity);
 
     void inject(SelectMinimalDialog selectMinimalDialog);
 
@@ -220,19 +212,99 @@ public interface AppDependencyComponent {
 
     void inject(SaveAnswerFileErrorDialogFragment saveAnswerFileErrorDialogFragment);
 
+    void inject(AudioRecordingErrorDialogFragment audioRecordingErrorDialogFragment);
+
+    void inject(InstanceChooserList instanceChooserList);
+
+    void inject(FormsProvider formsProvider);
+
+    void inject(InstanceProvider instanceProvider);
+
+    void inject(BackgroundAudioPermissionDialogFragment backgroundAudioPermissionDialogFragment);
+
+    void inject(ChangeAdminPasswordDialog changeAdminPasswordDialog);
+
+    void inject(MediaLoadingTask mediaLoadingTask);
+
+    void inject(ThemeUtils themeUtils);
+
+    void inject(BaseProjectPreferencesFragment baseProjectPreferencesFragment);
+
+    void inject(BaseAdminPreferencesFragment baseAdminPreferencesFragment);
+
+    void inject(CaptionedListPreference captionedListPreference);
+
+    void inject(AndroidShortcutsActivity androidShortcutsActivity);
+
+    void inject(ProjectSettingsDialog projectSettingsDialog);
+
+    void inject(ManualProjectCreatorDialog manualProjectCreatorDialog);
+
+    void inject(QrCodeProjectCreatorDialog qrCodeProjectCreatorDialog);
+
+    void inject(FirstLaunchActivity firstLaunchActivity);
+
+    void inject(InstanceUploader instanceUploader);
+
+    void inject(FormUriActivity formUriActivity);
+
+    void inject(MapsPreferencesFragment mapsPreferencesFragment);
+
+    void inject(FormsDownloadResultDialog formsDownloadResultDialog);
+
+    void inject(SelectOneFromMapDialogFragment selectOneFromMapDialogFragment);
+
+    void inject(DrawActivity drawActivity);
+
+    void inject(BlankFormListActivity blankFormListActivity);
+
+    void inject(DeleteRepeatDialogFragment deleteRepeatDialogFragment);
+
+    void inject(AppListActivity appListActivity);
+
+    void inject(DownloadFormListTask downloadFormListTask);
+
     OpenRosaHttpInterface openRosaHttpInterface();
 
     ReferenceManager referenceManager();
 
-    Analytics analytics();
-
-    GeneralSharedPreferences generalSharedPreferences();
-
-    AdminSharedPreferences adminSharedPreferences();
-
-    PreferencesProvider preferencesProvider();
+    SettingsProvider settingsProvider();
 
     ApplicationInitializer applicationInitializer();
 
-    SettingsImporter settingsImporter();
+    ODKAppSettingsImporter settingsImporter();
+
+    ProjectsRepository projectsRepository();
+
+    ProjectsDataService currentProjectProvider();
+
+    StoragePathProvider storagePathProvider();
+
+    FormsRepositoryProvider formsRepositoryProvider();
+
+    InstancesRepositoryProvider instancesRepositoryProvider();
+
+    FormSourceProvider formSourceProvider();
+
+    ExistingProjectMigrator existingProjectMigrator();
+
+    ProjectResetter projectResetter();
+
+    MapFragmentFactory mapFragmentFactory();
+
+    Scheduler scheduler();
+
+    LocationClient locationClient();
+
+    PermissionsProvider permissionsProvider();
+
+    PermissionsChecker permissionsChecker();
+
+    ReferenceLayerRepository referenceLayerRepository();
+
+    NetworkStateProvider networkStateProvider();
+
+    EntitiesRepositoryProvider entitiesRepositoryProvider();
+
+    FormsDataService formsDataService();
 }

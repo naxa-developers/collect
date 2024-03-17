@@ -16,18 +16,17 @@
 
 package org.odk.collect.android.instrumented.utilities;
 
-import android.Manifest;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.rule.GrantPermissionRule;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.support.RunnableRule;
+import org.odk.collect.android.support.rules.RunnableRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
 import org.odk.collect.android.utilities.CustomSQLiteQueryExecutor;
 
 import java.io.File;
@@ -47,11 +46,7 @@ public class CustomSQLiteQueryExecutionTest {
     private SQLiteDatabase sqLiteDatabase;
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            )
+    public RuleChain copyFormChain = TestRuleChain.chain()
             .around(new RunnableRule(() -> {
                 try {
                     File dbPath = File.createTempFile("test", ".db");

@@ -17,16 +17,18 @@
 package org.odk.collect.android.widgets.items;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
-import androidx.annotation.Nullable;
 import android.webkit.WebView;
+
+import androidx.annotation.Nullable;
 
 import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.SelectOneData;
-import org.odk.collect.android.activities.FormEntryActivity;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.listeners.AdvanceToNextListener;
 import org.odk.collect.android.utilities.SelectOneWidgetUtils;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
 
 /**
  * A widget which is responsible for multi select questions represented by
@@ -40,8 +42,8 @@ public class SelectOneImageMapWidget extends SelectImageMapWidget {
 
     private final boolean autoAdvance;
 
-    public SelectOneImageMapWidget(Context context, QuestionDetails questionDetails, boolean autoAdvance) {
-        super(context, questionDetails);
+    public SelectOneImageMapWidget(Context context, QuestionDetails questionDetails, boolean autoAdvance, SelectChoiceLoader selectChoiceLoader) {
+        super(context, questionDetails, selectChoiceLoader);
 
         this.autoAdvance = autoAdvance;
 
@@ -73,10 +75,14 @@ public class SelectOneImageMapWidget extends SelectImageMapWidget {
     protected void selectArea(String areaId) {
         super.selectArea(areaId);
 
-        ((FormEntryActivity) getContext()).runOnUiThread(() -> {
+        ((Activity) getContext()).runOnUiThread(() -> {
             if (autoAdvance && listener != null) {
                 listener.advance();
             }
         });
+    }
+
+    @Override
+    public void setOnLongClickListener(OnLongClickListener l) {
     }
 }

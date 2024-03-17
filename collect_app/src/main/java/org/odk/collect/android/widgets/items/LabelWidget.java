@@ -1,11 +1,11 @@
 /*
  * Copyright (C) 2011 University of Washington
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software distributed under the License
  * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
  * or implied. See the License for the specific language governing permissions and limitations under
@@ -26,17 +26,23 @@ import android.widget.ImageView.ScaleType;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import org.javarosa.core.model.SelectChoice;
 import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.reference.InvalidReferenceException;
 import org.javarosa.core.reference.ReferenceManager;
 import org.javarosa.form.api.FormEntryCaption;
 import org.odk.collect.android.R;
-import org.odk.collect.android.external.ExternalSelectChoice;
+import org.odk.collect.android.dynamicpreload.ExternalSelectChoice;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.utilities.FileUtils;
+import org.odk.collect.android.utilities.HtmlUtils;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
+import org.odk.collect.androidshared.bitmap.ImageFileUtils;
+import org.odk.collect.android.widgets.QuestionWidget;
+import org.odk.collect.android.widgets.interfaces.SelectChoiceLoader;
 import org.odk.collect.android.widgets.warnings.SpacesInUnderlyingValuesWarning;
 
 import java.io.File;
+import java.util.List;
 
 import timber.log.Timber;
 
@@ -49,10 +55,15 @@ import timber.log.Timber;
  * @author Jeff Beorse
  */
 @SuppressLint("ViewConstructor")
-public class LabelWidget extends ItemsWidget {
+public class LabelWidget extends QuestionWidget {
 
-    public LabelWidget(Context context, QuestionDetails questionDetails) {
+    private final List<SelectChoice> items;
+
+    public LabelWidget(Context context, QuestionDetails questionDetails, SelectChoiceLoader selectChoiceLoader) {
         super(context, questionDetails);
+        render();
+
+        items = ItemsWidgetUtils.loadItemsAndHandleErrors(this, questionDetails.getPrompt(), selectChoiceLoader);
         addItems(context, questionDetails);
         SpacesInUnderlyingValuesWarning.forQuestionWidget(this).renderWarningIfNecessary(items);
     }
@@ -91,7 +102,7 @@ public class LabelWidget extends ItemsWidget {
                                 DisplayMetrics metrics = context.getResources().getDisplayMetrics();
                                 int screenWidth = metrics.widthPixels;
                                 int screenHeight = metrics.heightPixels;
-                                b = FileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
+                                b = ImageFileUtils.getBitmapScaledToDisplay(imageFile, screenHeight, screenWidth);
                             } catch (OutOfMemoryError e) {
                                 Timber.e(e);
                                 errorMsg = "ERROR: " + e.getMessage();
@@ -107,19 +118,19 @@ public class LabelWidget extends ItemsWidget {
                                 // An error hasn't been logged and loading the image failed, so it's
                                 // likely
                                 // a bad file.
-                                errorMsg = getContext().getString(R.string.file_invalid, imageFile);
+                                errorMsg = getContext().getString(org.odk.collect.strings.R.string.file_invalid, imageFile);
 
                             }
                         } else {
                             // An error hasn't been logged. We should have an image, but the file
                             // doesn't
                             // exist.
-                            errorMsg = getContext().getString(R.string.file_missing, imageFile);
+                            errorMsg = getContext().getString(org.odk.collect.strings.R.string.file_missing, imageFile);
                         }
 
                         if (errorMsg != null) {
                             // errorMsg is only set when an error has occured
-                            Timber.e(errorMsg);
+                            Timber.e(new Error(errorMsg));
                             missingImage = new TextView(getContext());
                             missingImage.setText(errorMsg);
 
@@ -136,8 +147,8 @@ public class LabelWidget extends ItemsWidget {
                 // build text label. Don't assign the text to the built in label to he
                 // button because it aligns horizontally, and we want the label on top
                 TextView label = new TextView(getContext());
-                label.setText(questionDetails.getPrompt().getSelectChoiceText(items.get(i)));
-                label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, getAnswerFontSize());
+                label.setText(HtmlUtils.textToHtml(questionDetails.getPrompt().getSelectChoiceText(items.get(i))));
+                label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, QuestionFontSizeUtils.getFontSize(settings, QuestionFontSizeUtils.FontSize.HEADLINE_6));
                 label.setGravity(Gravity.CENTER_HORIZONTAL);
 
                 // answer layout holds the label text/image on top and the radio button on bottom
@@ -187,5 +198,9 @@ public class LabelWidget extends ItemsWidget {
     @Override
     public IAnswerData getAnswer() {
         return null;
+    }
+
+    @Override
+    public void setOnLongClickListener(OnLongClickListener l) {
     }
 }

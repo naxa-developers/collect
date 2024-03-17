@@ -6,16 +6,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
-import org.odk.collect.android.R;
-import org.odk.collect.android.support.CollectTestRule;
+import org.odk.collect.android.support.rules.CollectTestRule;
 import org.odk.collect.android.support.TestDependencies;
-import org.odk.collect.android.support.TestRuleChain;
+import org.odk.collect.android.support.rules.TestRuleChain;
 import org.odk.collect.android.support.pages.GetBlankFormPage;
 
 @RunWith(AndroidJUnit4.class)
 public class GetBlankFormsTest {
 
-    public CollectTestRule rule = new CollectTestRule();
+    public CollectTestRule rule = new CollectTestRule(false);
 
     final TestDependencies testDependencies = new TestDependencies();
 
@@ -28,12 +27,11 @@ public class GetBlankFormsTest {
         testDependencies.server.setCredentials("Draymond", "Green");
         testDependencies.server.addForm("One Question", "one-question", "1", "one-question.xml");
 
-        rule.mainMenu()
-                .setServer(testDependencies.server.getURL())
+        rule.withProject(testDependencies.server.getURL())
                 .clickGetBlankFormWithAuthenticationError()
                 .fillUsername("Draymond")
                 .fillPassword("Green")
-                .clickOK(new GetBlankFormPage(rule))
+                .clickOK(new GetBlankFormPage())
                 .assertText("One Question");
     }
 
@@ -41,12 +39,10 @@ public class GetBlankFormsTest {
     public void whenThereIsAnErrorFetchingFormList_showsError() {
         testDependencies.server.alwaysReturnError();
 
-        rule.mainMenu()
-                .setServer(testDependencies.server.getURL())
+        rule.withProject(testDependencies.server.getURL())
                 .clickGetBlankFormWithError()
-                .assertText(R.string.load_remote_form_error)
-                .assertText(R.string.report_to_project_lead)
-                .clickOK(new GetBlankFormPage(rule));
+                .assertText(org.odk.collect.strings.R.string.load_remote_form_error)
+                .clickOK(new GetBlankFormPage());
     }
 
     @Test
@@ -54,11 +50,12 @@ public class GetBlankFormsTest {
         testDependencies.server.addForm("One Question", "one-question", "1", "one-question.xml");
         testDependencies.server.errorOnFetchingForms();
 
-        rule.mainMenu()
-                .setServer(testDependencies.server.getURL())
+        rule.withProject(testDependencies.server.getURL())
                 .clickGetBlankForm()
                 .clickGetSelected()
-                .assertText("One Question (Version:: 1 ID: one-question) - Failure")
-                .clickOK(new GetBlankFormPage(rule));
+                .assertMessage("1 of 1 downloads failed!")
+                .showDetails()
+                .assertError("The server https://server.example.com returned status code 500. If you keep having this problem, report it to the person who asked you to collect data.")
+                .navigateBack();
     }
 }

@@ -14,23 +14,21 @@
 
 package org.odk.collect.android.upload;
 
-import android.content.SharedPreferences;
 import android.net.Uri;
-import android.preference.PreferenceManager;
+
 import androidx.annotation.NonNull;
 
-import org.odk.collect.android.R;
 import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.instances.Instance;
 import org.odk.collect.android.openrosa.CaseInsensitiveHeaders;
 import org.odk.collect.android.openrosa.HttpHeadResult;
 import org.odk.collect.android.openrosa.HttpPostResult;
 import org.odk.collect.android.openrosa.OpenRosaConstants;
 import org.odk.collect.android.openrosa.OpenRosaHttpInterface;
-import org.odk.collect.android.preferences.GeneralKeys;
 import org.odk.collect.android.utilities.ResponseMessageParser;
-import org.odk.collect.android.utilities.TranslationHandler;
 import org.odk.collect.android.utilities.WebCredentialsUtils;
+import org.odk.collect.forms.instances.Instance;
+import org.odk.collect.settings.keys.ProjectKeys;
+import org.odk.collect.shared.settings.Settings;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -38,6 +36,7 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,29 +44,34 @@ import javax.net.ssl.HttpsURLConnection;
 
 import timber.log.Timber;
 
+import static org.odk.collect.strings.localization.LocalizedApplicationKt.getLocalizedString;
+
 public class InstanceServerUploader extends InstanceUploader {
     private static final String URL_PATH_SEP = "/";
 
     private final OpenRosaHttpInterface httpInterface;
     private final WebCredentialsUtils webCredentialsUtils;
-    private final Map<Uri, Uri> uriRemap;
+    private final Settings generalSettings;
+    private final Map<Uri, Uri> uriRemap = new HashMap<>();
 
     public InstanceServerUploader(OpenRosaHttpInterface httpInterface,
                                   WebCredentialsUtils webCredentialsUtils,
-                                  Map<Uri, Uri> uriRemap) {
+                                  Settings generalSettings) {
         this.httpInterface = httpInterface;
         this.webCredentialsUtils = webCredentialsUtils;
-        this.uriRemap = uriRemap;
+        this.generalSettings = generalSettings;
     }
 
     /**
      * Uploads all files associated with an instance to the specified URL. Writes fail/success
      * status to database.
-     *
+     * <p>
      * Returns a custom success message if one is provided by the server.
      */
     @Override
-    public String uploadOneSubmission(Instance instance, String urlString) throws UploadException {
+    public String uploadOneSubmission(Instance instance, String urlString) throws FormUploadException {
+        markSubmissionFailed(instance);
+
         Uri submissionUri = Uri.parse(urlString);
 
         long contentLength = 10000000L;
@@ -77,21 +81,19 @@ public class InstanceServerUploader extends InstanceUploader {
         // the proper scheme.
         if (uriRemap.containsKey(submissionUri)) {
             submissionUri = uriRemap.get(submissionUri);
-            Timber.i("Using Uri remap for submission %s. Now: %s", instance.getId(),
+            Timber.i("Using Uri remap for submission %s. Now: %s", instance.getDbId(),
                     submissionUri.toString());
         } else {
             if (submissionUri.getHost() == null) {
-                saveFailedStatusToDatabase(instance);
-                throw new UploadException(FAIL + "Host name may not be null");
+                throw new FormUploadException(FAIL + "Host name may not be null");
             }
 
             URI uri;
             try {
                 uri = URI.create(submissionUri.toString());
             } catch (IllegalArgumentException e) {
-                saveFailedStatusToDatabase(instance);
                 Timber.d(e.getMessage() != null ? e.getMessage() : e.toString());
-                throw new UploadException(TranslationHandler.getString(Collect.getInstance(), R.string.url_error));
+                throw new FormUploadException(getLocalizedString(Collect.getInstance(), org.odk.collect.strings.R.string.url_error));
             }
 
             HttpHeadResult headResult;
@@ -110,14 +112,12 @@ public class InstanceServerUploader extends InstanceUploader {
                 }
 
             } catch (Exception e) {
-                saveFailedStatusToDatabase(instance);
-                throw new UploadException(FAIL
+                throw new FormUploadException(FAIL
                         + (e.getMessage() != null ? e.getMessage() : e.toString()));
             }
 
             if (headResult.getStatusCode() == HttpsURLConnection.HTTP_UNAUTHORIZED) {
-                saveFailedStatusToDatabase(instance);
-                throw new UploadAuthRequestedException(TranslationHandler.getString(Collect.getInstance(), R.string.server_auth_credentials, submissionUri.getHost()),
+                throw new FormUploadAuthRequestedException(getLocalizedString(Collect.getInstance(), org.odk.collect.strings.R.string.server_auth_credentials, submissionUri.getHost()),
                         submissionUri);
             } else if (headResult.getStatusCode() == HttpsURLConnection.HTTP_NO_CONTENT) {
                 // Redirect header received
@@ -137,21 +137,18 @@ public class InstanceServerUploader extends InstanceUploader {
                         } else {
                             // Don't follow a redirection attempt to a different host.
                             // We can't tell if this is a spoof or not.
-                            saveFailedStatusToDatabase(instance);
-                            throw new UploadException(FAIL
+                            throw new FormUploadException(FAIL
                                     + "Unexpected redirection attempt to a different host: "
                                     + newURI.toString());
                         }
                     } catch (Exception e) {
-                        saveFailedStatusToDatabase(instance);
-                        throw new UploadException(FAIL + urlString + " " + e.toString());
+                        throw new FormUploadException(FAIL + urlString + " " + e.toString());
                     }
                 }
             } else {
                 if (headResult.getStatusCode() >= HttpsURLConnection.HTTP_OK
                         && headResult.getStatusCode() < HttpsURLConnection.HTTP_MULT_CHOICE) {
-                    saveFailedStatusToDatabase(instance);
-                    throw new UploadException("Failed to send to " + uri + ". Is this an OpenRosa " +
+                    throw new FormUploadException("Failed to send to " + uri + ". Is this an OpenRosa " +
                             "submission endpoint? If you have a web proxy you may need to log in to " +
                             "your network.\n\nHEAD request result status code: " + headResult.getStatusCode());
                 }
@@ -163,7 +160,7 @@ public class InstanceServerUploader extends InstanceUploader {
         // submission files on disk.  In this case, upload the submission.xml and all the files in
         // the directory. This means the plaintext files and the encrypted files will be sent to the
         // server and the server will have to figure out what to do with them.
-        File instanceFile = new File(instance.getAbsoluteInstanceFilePath());
+        File instanceFile = new File(instance.getInstanceFilePath());
         File submissionFile = new File(instanceFile.getParentFile(), "submission.xml");
         if (submissionFile.exists()) {
             Timber.w("submission.xml will be uploaded instead of %s", instanceFile.getAbsolutePath());
@@ -172,15 +169,14 @@ public class InstanceServerUploader extends InstanceUploader {
         }
 
         if (!instanceFile.exists() && !submissionFile.exists()) {
-            saveFailedStatusToDatabase(instance);
-            throw new UploadException(FAIL + "instance XML file does not exist!");
+            throw new FormUploadException(FAIL + "instance XML file does not exist!");
         }
 
         List<File> files = getFilesInParentDirectory(instanceFile, submissionFile);
 
         // TODO: when can this happen? It used to cause the whole submission attempt to fail. Should it?
         if (files == null) {
-            throw new UploadException("Error reading files to upload");
+            throw new FormUploadException("Error reading files to upload");
         }
 
         HttpPostResult postResult;
@@ -189,41 +185,39 @@ public class InstanceServerUploader extends InstanceUploader {
         try {
             URI uri = URI.create(submissionUri.toString());
 
-            postResult = httpInterface.uploadSubmissionFile(files, submissionFile, uri,
+            postResult = httpInterface.uploadSubmissionAndFiles(submissionFile, files, uri,
                     webCredentialsUtils.getCredentials(uri), contentLength);
 
             int responseCode = postResult.getResponseCode();
             messageParser.setMessageResponse(postResult.getHttpResponse());
 
             if (responseCode != HttpsURLConnection.HTTP_CREATED && responseCode != HttpsURLConnection.HTTP_ACCEPTED) {
-                UploadException exception;
+                FormUploadException exception;
                 if (responseCode == HttpsURLConnection.HTTP_OK) {
-                    exception = new UploadException(FAIL + "Network login failure? Again?");
+                    exception = new FormUploadException(FAIL + "Network login failure? Again?");
                 } else if (responseCode == HttpsURLConnection.HTTP_UNAUTHORIZED) {
-                    exception = new UploadException(FAIL + postResult.getReasonPhrase()
+                    exception = new FormUploadException(FAIL + postResult.getReasonPhrase()
                             + " (" + responseCode + ") at " + urlString);
                 } else {
                     if (messageParser.isValid()) {
-                        exception = new UploadException(FAIL + messageParser.getMessageResponse());
+                        exception = new FormUploadException(FAIL + messageParser.getMessageResponse());
                     } else if (responseCode == HttpsURLConnection.HTTP_BAD_REQUEST) {
                         Timber.w(FAIL + postResult.getReasonPhrase() + " (" + responseCode + ") at " + urlString);
-                        exception = new UploadException("Failed to upload. Please make sure the form is configured to accept submissions on the server");
+                        exception = new FormUploadException("Failed to upload. Please make sure the form is configured to accept submissions on the server");
                     } else {
-                        exception = new UploadException(FAIL + postResult.getReasonPhrase() + " (" + responseCode + ") at " + urlString);
+                        exception = new FormUploadException(FAIL + postResult.getReasonPhrase() + " (" + responseCode + ") at " + urlString);
                     }
 
                 }
-                saveFailedStatusToDatabase(instance);
                 throw exception;
             }
 
         } catch (Exception e) {
-            saveFailedStatusToDatabase(instance);
-            throw new UploadException(FAIL + "Generic Exception: "
+            throw new FormUploadException(FAIL + "Generic Exception: "
                     + (e.getMessage() != null ? e.getMessage() : e.toString()));
         }
 
-        saveSuccessStatusToDatabase(instance);
+        markSubmissionComplete(instance);
 
         if (messageParser.isValid()) {
             return messageParser.getMessageResponse();
@@ -261,7 +255,7 @@ public class InstanceServerUploader extends InstanceUploader {
 
     /**
      * Returns the URL this instance should be submitted to with appended deviceId.
-     *
+     * <p>
      * If the upload was triggered by an external app and specified an override URL, use that one.
      * Otherwise, use the submission URL configured in the form
      * (https://getodk.github.io/xforms-spec/#submission-attributes). Finally, default to the
@@ -269,7 +263,7 @@ public class InstanceServerUploader extends InstanceUploader {
      */
     @Override
     @NonNull
-    public String getUrlToSubmitTo(Instance currentInstance, String deviceId, String overrideURL) {
+    public String getUrlToSubmitTo(Instance currentInstance, String deviceId, String overrideURL, String urlFromSettings) {
         String urlString;
 
         if (overrideURL != null) {
@@ -291,26 +285,12 @@ public class InstanceServerUploader extends InstanceUploader {
     }
 
     private String getServerSubmissionURL() {
-
-        Collect app = Collect.getInstance();
-
-        SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(
-                Collect.getInstance());
-        String serverBase = settings.getString(GeneralKeys.KEY_SERVER_URL,
-                app.getString(R.string.default_server_url));
+        String serverBase = generalSettings.getString(ProjectKeys.KEY_SERVER_URL);
 
         if (serverBase.endsWith(URL_PATH_SEP)) {
             serverBase = serverBase.substring(0, serverBase.length() - 1);
         }
 
-        // NOTE: /submission must not be translated! It is the well-known path on the server.
-        String submissionPath = settings.getString(GeneralKeys.KEY_SUBMISSION_URL,
-                app.getString(R.string.default_odk_submission));
-
-        if (!submissionPath.startsWith(URL_PATH_SEP)) {
-            submissionPath = URL_PATH_SEP + submissionPath;
-        }
-
-        return serverBase + submissionPath;
+        return serverBase + OpenRosaConstants.SUBMISSION;
     }
 }

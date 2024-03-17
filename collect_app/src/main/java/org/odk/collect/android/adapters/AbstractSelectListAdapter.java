@@ -38,13 +38,15 @@ import org.javarosa.form.api.FormEntryCaption;
 import org.javarosa.form.api.FormEntryPrompt;
 import org.odk.collect.android.R;
 import org.odk.collect.android.audio.AudioHelper;
-import org.odk.collect.android.external.ExternalSelectChoice;
+import org.odk.collect.android.dynamicpreload.ExternalSelectChoice;
 import org.odk.collect.android.formentry.questions.AudioVideoImageTextLabel;
 import org.odk.collect.android.formentry.questions.NoButtonsItem;
-import org.odk.collect.android.utilities.QuestionFontSizeUtils;
-import org.odk.collect.android.utilities.StringUtils;
-import org.odk.collect.android.utilities.WidgetAppearanceUtils;
+import org.odk.collect.android.utilities.MediaUtils;
+import org.odk.collect.android.utilities.HtmlUtils;
+import org.odk.collect.android.utilities.Appearances;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
 import org.odk.collect.audioclips.Clip;
+import org.odk.collect.imageloader.GlideImageLoader;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -56,7 +58,6 @@ import timber.log.Timber;
 import static org.odk.collect.android.formentry.media.FormMediaUtils.getClip;
 import static org.odk.collect.android.formentry.media.FormMediaUtils.getClipID;
 import static org.odk.collect.android.formentry.media.FormMediaUtils.getPlayableAudioURI;
-import static org.odk.collect.android.widgets.QuestionWidget.isRTL;
 
 public abstract class AbstractSelectListAdapter extends RecyclerView.Adapter<AbstractSelectListAdapter.ViewHolder>
         implements Filterable {
@@ -70,10 +71,11 @@ public abstract class AbstractSelectListAdapter extends RecyclerView.Adapter<Abs
     protected final int playColor;
     protected final int numColumns;
     protected boolean noButtonsMode;
+    private final MediaUtils mediaUtils;
 
     AbstractSelectListAdapter(Context context, List<SelectChoice> items, FormEntryPrompt prompt,
                               ReferenceManager referenceManager, AudioHelper audioHelper,
-                              int playColor, int numColumns, boolean noButtonsMode) {
+                              int playColor, int numColumns, boolean noButtonsMode, MediaUtils mediaUtils) {
         this.context = context;
         this.items = items;
         this.filteredItems = items;
@@ -83,6 +85,7 @@ public abstract class AbstractSelectListAdapter extends RecyclerView.Adapter<Abs
         this.playColor = playColor;
         this.numColumns = numColumns;
         this.noButtonsMode = noButtonsMode;
+        this.mediaUtils = mediaUtils;
     }
 
     @Override
@@ -131,10 +134,8 @@ public abstract class AbstractSelectListAdapter extends RecyclerView.Adapter<Abs
 
     void setUpButton(TextView button, int index) {
         button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, QuestionFontSizeUtils.getQuestionFontSize());
-        button.setText(StringUtils.textToHtml(prompt.getSelectChoiceText(filteredItems.get(index))));
+        button.setText(HtmlUtils.textToHtml(prompt.getSelectChoiceText(filteredItems.get(index))));
         button.setTag(items.indexOf(filteredItems.get(index)));
-        button.setGravity(isRTL() ? Gravity.END : Gravity.START);
-        button.setTextAlignment(isRTL() ? View.TEXT_ALIGNMENT_TEXT_END : View.TEXT_ALIGNMENT_TEXT_START);
     }
 
     boolean isItemSelected(List<Selection> selectedItems, @NonNull Selection item) {
@@ -202,11 +203,11 @@ public abstract class AbstractSelectListAdapter extends RecyclerView.Adapter<Abs
 
         private String getChoiceText(int index) {
             SelectChoice selectChoice = filteredItems.get(index);
-            return StringUtils.textToHtml(prompt.getSelectChoiceText(selectChoice)).toString();
+            return HtmlUtils.textToHtml(prompt.getSelectChoiceText(selectChoice)).toString();
         }
 
         private String getErrorMsg(File imageFile) {
-            return context.getString(R.string.file_missing, imageFile);
+            return context.getString(org.odk.collect.strings.R.string.file_missing, imageFile);
         }
 
         private void enableLongClickToAllowRemovingAnswers(View view) {
@@ -228,6 +229,7 @@ public abstract class AbstractSelectListAdapter extends RecyclerView.Adapter<Abs
 
             audioVideoImageTextLabel.setTag(getClipID(prompt, item));
             audioVideoImageTextLabel.setTextView(textView);
+            audioVideoImageTextLabel.setMediaUtils(mediaUtils);
 
             String imageURI = getImageURI(index, items);
             String videoURI = prompt.getSpecialFormSelectChoiceText(item, "video");
@@ -235,7 +237,7 @@ public abstract class AbstractSelectListAdapter extends RecyclerView.Adapter<Abs
             String audioURI = getPlayableAudioURI(prompt, item, referenceManager);
             try {
                 if (imageURI != null) {
-                    audioVideoImageTextLabel.setImage(new File(referenceManager.deriveReference(imageURI).getLocalURI()));
+                    audioVideoImageTextLabel.setImage(new File(referenceManager.deriveReference(imageURI).getLocalURI()), new GlideImageLoader());
                 }
                 if (bigImageURI != null) {
                     audioVideoImageTextLabel.setBigImage(new File(referenceManager.deriveReference(bigImageURI).getLocalURI()));
@@ -265,7 +267,7 @@ public abstract class AbstractSelectListAdapter extends RecyclerView.Adapter<Abs
         }
 
         void adjustAudioVideoImageTextLabelForFlexAppearance() {
-            if (WidgetAppearanceUtils.isFlexAppearance(prompt)) {
+            if (Appearances.isFlexAppearance(prompt)) {
                 RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
 
                 audioVideoImageTextLabel.findViewById(R.id.audio_video_image_text_label_container).setLayoutParams(params);

@@ -14,24 +14,22 @@
 
 package org.odk.collect.android.tasks;
 
-import org.odk.collect.android.R;
-import org.odk.collect.android.analytics.Analytics;
+import org.odk.collect.analytics.Analytics;
 import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.instances.Instance;
+import org.odk.collect.forms.instances.Instance;
 import org.odk.collect.android.openrosa.OpenRosaHttpInterface;
-import org.odk.collect.android.logic.PropertyManager;
 import org.odk.collect.android.upload.InstanceServerUploader;
-import org.odk.collect.android.upload.UploadAuthRequestedException;
-import org.odk.collect.android.upload.UploadException;
-import org.odk.collect.android.utilities.TranslationHandler;
+import org.odk.collect.android.upload.FormUploadAuthRequestedException;
+import org.odk.collect.android.upload.FormUploadException;
 import org.odk.collect.android.utilities.WebCredentialsUtils;
+import org.odk.collect.metadata.PropertyManager;
 
-import java.util.HashMap;
 import java.util.List;
 
 import javax.inject.Inject;
 
 import static org.odk.collect.android.analytics.AnalyticsEvents.SUBMISSION;
+import static org.odk.collect.strings.localization.LocalizedApplicationKt.getLocalizedString;
 
 /**
  * Background task for uploading completed forms.
@@ -46,7 +44,7 @@ public class InstanceServerUploaderTask extends InstanceUploaderTask {
     WebCredentialsUtils webCredentialsUtils;
 
     @Inject
-    Analytics analytics;
+    PropertyManager propertyManager;
 
     // Custom submission URL, username and password that can be sent via intent extras by external
     // applications
@@ -62,11 +60,10 @@ public class InstanceServerUploaderTask extends InstanceUploaderTask {
     public Outcome doInBackground(Long... instanceIdsToUpload) {
         Outcome outcome = new Outcome();
 
-        InstanceServerUploader uploader = new InstanceServerUploader(httpInterface, webCredentialsUtils, new HashMap<>());
+        InstanceServerUploader uploader = new InstanceServerUploader(httpInterface, webCredentialsUtils, settingsProvider.getUnprotectedSettings());
         List<Instance> instancesToUpload = uploader.getInstancesFromIds(instanceIdsToUpload);
 
-        String deviceId = new PropertyManager(Collect.getInstance().getApplicationContext())
-                    .getSingularProperty(PropertyManager.PROPMGR_DEVICE_ID);
+        String deviceId = propertyManager.getSingularProperty(PropertyManager.PROPMGR_DEVICE_ID);
 
         for (int i = 0; i < instancesToUpload.size(); i++) {
             if (isCancelled()) {
@@ -77,20 +74,20 @@ public class InstanceServerUploaderTask extends InstanceUploaderTask {
             publishProgress(i + 1, instancesToUpload.size());
 
             try {
-                String destinationUrl = uploader.getUrlToSubmitTo(instance, deviceId, completeDestinationUrl);
+                String destinationUrl = uploader.getUrlToSubmitTo(instance, deviceId, completeDestinationUrl, null);
                 String customMessage = uploader.uploadOneSubmission(instance, destinationUrl);
-                outcome.messagesByInstanceId.put(instance.getId().toString(),
-                        customMessage != null ? customMessage : TranslationHandler.getString(Collect.getInstance(), R.string.success));
+                outcome.messagesByInstanceId.put(instance.getDbId().toString(),
+                        customMessage != null ? customMessage : getLocalizedString(Collect.getInstance(), org.odk.collect.strings.R.string.success));
 
-                analytics.logEvent(SUBMISSION, "HTTP", Collect.getFormIdentifierHash(instance.getJrFormId(), instance.getJrVersion()));
-            } catch (UploadAuthRequestedException e) {
+                Analytics.log(SUBMISSION, "HTTP", Collect.getFormIdentifierHash(instance.getFormId(), instance.getFormVersion()));
+            } catch (FormUploadAuthRequestedException e) {
                 outcome.authRequestingServer = e.getAuthRequestingServer();
                 // Don't add the instance that caused an auth request to the map because we want to
                 // retry. Items present in the map are considered already attempted and won't be
                 // retried.
-            } catch (UploadException e) {
-                outcome.messagesByInstanceId.put(instance.getId().toString(),
-                        e.getDisplayMessage());
+            } catch (FormUploadException e) {
+                outcome.messagesByInstanceId.put(instance.getDbId().toString(),
+                        e.getMessage());
             }
         }
         

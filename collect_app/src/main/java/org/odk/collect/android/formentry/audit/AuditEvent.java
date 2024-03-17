@@ -21,8 +21,6 @@ import androidx.annotation.NonNull;
 import org.javarosa.core.model.FormIndex;
 import org.javarosa.form.api.FormEntryController;
 
-import static org.odk.collect.android.utilities.CSVUtils.getEscapedValueForCsv;
-
 public class AuditEvent {
 
     public enum AuditEventType {
@@ -60,6 +58,10 @@ public class AuditEvent {
         DELETE_REPEAT("delete repeat"),
 
         CHANGE_REASON("change reason"),
+
+        BACKGROUND_AUDIO_DISABLED("background audio disabled"),
+
+        BACKGROUND_AUDIO_ENABLED("background audio enabled"),
 
         // Google Play Services are not available
         GOOGLE_PLAY_SERVICES_NOT_AVAILABLE("google play services not available", true, false, true),
@@ -206,14 +208,6 @@ public class AuditEvent {
             this.oldValue = "";
             this.newValue = "";
             return false;
-        }
-
-        if (oldValue.contains(",") || oldValue.contains("\n")) {
-            oldValue = getEscapedValueForCsv(oldValue);
-        }
-
-        if (this.newValue.contains(",") || this.newValue.contains("\n")) {
-            this.newValue = getEscapedValueForCsv(this.newValue);
         }
 
         return true;

@@ -1,14 +1,14 @@
 package org.odk.collect.android.utilities;
 
 import android.net.Uri;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
-import org.odk.collect.android.logic.PropertyManager;
+import androidx.annotation.NonNull;
+
 import org.odk.collect.android.openrosa.HttpCredentials;
 import org.odk.collect.android.openrosa.HttpCredentialsInterface;
-import org.odk.collect.android.preferences.GeneralSharedPreferences;
-import org.odk.collect.android.preferences.GeneralKeys;
+import org.odk.collect.metadata.PropertyManager;
+import org.odk.collect.settings.keys.ProjectKeys;
+import org.odk.collect.shared.settings.Settings;
 
 import java.net.URI;
 import java.util.HashMap;
@@ -19,7 +19,13 @@ import javax.inject.Singleton;
 @Singleton
 public class WebCredentialsUtils {
 
+    private final Settings generalSettings;
+
     private static final Map<String, HttpCredentialsInterface> HOST_CREDENTIALS = new HashMap<>();
+
+    public WebCredentialsUtils(Settings generalSettings) {
+        this.generalSettings = generalSettings;
+    }
 
     public void saveCredentials(@NonNull String url, @NonNull String username, @NonNull String password) {
         if (username.isEmpty()) {
@@ -30,9 +36,9 @@ public class WebCredentialsUtils {
         HOST_CREDENTIALS.put(host, new HttpCredentials(username, password));
     }
 
-    public void saveCredentialsPreferences(GeneralSharedPreferences generalSharedPreferences, String userName, String password, PropertyManager propertyManager) {
-        generalSharedPreferences.save(GeneralKeys.KEY_USERNAME, userName);
-        generalSharedPreferences.save(GeneralKeys.KEY_PASSWORD, password);
+    public void saveCredentialsPreferences(String userName, String password, PropertyManager propertyManager) {
+        generalSettings.save(ProjectKeys.KEY_USERNAME, userName);
+        generalSettings.save(ProjectKeys.KEY_PASSWORD, password);
 
         propertyManager.reload();
     }
@@ -63,24 +69,15 @@ public class WebCredentialsUtils {
     }
 
     public String getServerUrlFromPreferences() {
-        if (GeneralSharedPreferences.getInstance() == null) {
-            return "";
-        }
-        return (String) GeneralSharedPreferences.getInstance().get(GeneralKeys.KEY_SERVER_URL);
+        return generalSettings.getString(ProjectKeys.KEY_SERVER_URL);
     }
 
     public String getPasswordFromPreferences() {
-        if (GeneralSharedPreferences.getInstance() == null) {
-            return "";
-        }
-        return (String) GeneralSharedPreferences.getInstance().get(GeneralKeys.KEY_PASSWORD);
+        return generalSettings.getString(ProjectKeys.KEY_PASSWORD);
     }
 
     public String getUserNameFromPreferences() {
-        if (GeneralSharedPreferences.getInstance() == null) {
-            return "";
-        }
-        return (String) GeneralSharedPreferences.getInstance().get(GeneralKeys.KEY_USERNAME);
+        return generalSettings.getString(ProjectKeys.KEY_USERNAME);
     }
 
     /**
@@ -89,21 +86,27 @@ public class WebCredentialsUtils {
      * @param url to find the credentials object
      * @return either null or an instance of HttpCredentialsInterface
      */
-    public @Nullable HttpCredentialsInterface getCredentials(@NonNull URI url) {
+    public @NonNull HttpCredentialsInterface getCredentials(@NonNull URI url) {
         String host = url.getHost();
         String serverPrefsUrl = getServerUrlFromPreferences();
         String prefsServerHost = (serverPrefsUrl == null) ? null : Uri.parse(serverPrefsUrl).getHost();
 
+        HttpCredentialsInterface hostCredentials = HOST_CREDENTIALS.get(host);
+
         // URL host is the same as the host in preferences
         if (prefsServerHost != null && prefsServerHost.equalsIgnoreCase(host)) {
             // Use the temporary credentials if they exist, otherwise use the credentials saved to preferences
-            if (HOST_CREDENTIALS.containsKey(host)) {
-                return HOST_CREDENTIALS.get(host);
+            if (hostCredentials != null) {
+                return hostCredentials;
             } else {
                 return new HttpCredentials(getUserNameFromPreferences(), getPasswordFromPreferences());
             }
         } else {
-            return HOST_CREDENTIALS.get(host);
+            if (hostCredentials != null) {
+                return hostCredentials;
+            } else {
+                return new HttpCredentials("", "");
+            }
         }
     }
 

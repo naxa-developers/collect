@@ -14,13 +14,18 @@
 
 package org.odk.collect.android.utilities;
 
+import static org.odk.collect.strings.localization.LocalizedApplicationKt.getLocalizedString;
+import static java.util.Arrays.asList;
+
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Environment;
-import android.os.ParcelFileDescriptor;
+import android.webkit.MimeTypeMap;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.google.common.base.CharMatcher;
 
 import org.apache.commons.io.IOUtils;
 import org.javarosa.core.model.Constants;
@@ -32,37 +37,30 @@ import org.javarosa.core.model.actions.setgeopoint.SetGeopointActionHandler;
 import org.javarosa.core.model.instance.FormInstance;
 import org.javarosa.core.model.instance.TreeElement;
 import org.javarosa.core.model.instance.TreeReference;
+import org.javarosa.xform.parse.XFormParser;
 import org.javarosa.xform.util.XFormUtils;
-import org.odk.collect.android.R;
 import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.storage.StorageStateProvider;
+import org.odk.collect.async.OngoingWorkListener;
+import org.odk.collect.shared.strings.StringUtils;
 
 import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.net.FileNameMap;
 import java.net.URLConnection;
 import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
-import java.util.NoSuchElementException;
 import java.util.Set;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import timber.log.Timber;
 
 /**
@@ -70,10 +68,8 @@ import timber.log.Timber;
  *
  * @author Carl Hartung (carlhartung@gmail.com)
  */
-public class FileUtils {
+public final class FileUtils {
 
-    // Used to validate and display valid form names.
-    public static final String VALID_FILENAME = "[ _\\-A-Za-z0-9]*.x[ht]*ml";
     public static final String FORMID = "formid";
     public static final String VERSION = "version"; // arbitrary string in OpenRosa 1.0
     public static final String TITLE = "title";
@@ -92,39 +88,15 @@ public class FileUtils {
     /** Valid XML stub that can be parsed without error. */
     public static final String STUB_XML = "<?xml version='1.0' ?><stub />";
 
-    /** True if we have checked whether /sdcard points to getExternalStorageDirectory(). */
-    private static boolean isSdcardSymlinkChecked;
-
-    /** The result of checking whether /sdcard points to getExternalStorageDirectory(). */
-    private static boolean isSdcardSymlinkSameAsExternalStorageDirectory;
-
-    static int bufSize = 16 * 1024; // May be set by unit test
-
     private FileUtils() {
     }
 
     public static void saveAnswerFileFromUri(Uri uri, File destFile, Context context) {
-        try {
-            ParcelFileDescriptor pfd = context.getContentResolver().openFileDescriptor(uri, "r");
-            if (pfd != null) {
-                FileDescriptor fd = pfd.getFileDescriptor();
-                InputStream fileInputStream = new FileInputStream(fd);
-                OutputStream fileOutputStream = new FileOutputStream(destFile);
-
-                byte[] buffer = new byte[1024];
-                int length;
-
-                while ((length = fileInputStream.read(buffer)) > 0) {
-                    fileOutputStream.write(buffer, 0, length);
-                }
-
-                fileOutputStream.flush();
-                fileInputStream.close();
-                fileOutputStream.close();
-                pfd.close();
-            }
+        try (InputStream fileInputStream = context.getContentResolver().openInputStream(uri);
+             OutputStream fileOutputStream = new FileOutputStream(destFile)) {
+            IOUtils.copy(fileInputStream, fileOutputStream);
         } catch (IOException e) {
-            Timber.w(e);
+            Timber.e(e);
         }
     }
 
@@ -136,119 +108,9 @@ public class FileUtils {
                 + fileExtension);
     }
 
-    public static String getMimeType(String fileUrl) throws IOException {
-        FileNameMap fileNameMap = URLConnection.getFileNameMap();
-        return fileNameMap.getContentTypeFor(fileUrl);
-    }
-
     public static boolean createFolder(String path) {
         File dir = new File(path);
         return dir.exists() || dir.mkdirs();
-    }
-
-    public static String getMd5Hash(File file) {
-        final InputStream is;
-        try {
-            is = new FileInputStream(file);
-
-        } catch (FileNotFoundException e) {
-            Timber.d(e, "Cache file %s not found", file.getAbsolutePath());
-            return null;
-
-        }
-
-        return getMd5Hash(is);
-    }
-
-    public static String getMd5Hash(InputStream is) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            final byte[] buffer = new byte[bufSize];
-
-            while (true) {
-                int result = is.read(buffer, 0, bufSize);
-                if (result == -1) {
-                    break;
-                }
-                md.update(buffer, 0, result);
-            }
-
-            StringBuilder md5 = new StringBuilder(new BigInteger(1, md.digest()).toString(16));
-            while (md5.length() < 32) {
-                md5.insert(0, "0");
-            }
-
-            is.close();
-            return md5.toString();
-
-        } catch (NoSuchAlgorithmException e) {
-            Timber.e(e);
-            return null;
-
-        } catch (IOException e) {
-            Timber.e(e, "Problem reading file.");
-            return null;
-        }
-    }
-
-    public static Bitmap getBitmapScaledToDisplay(File file, int screenHeight, int screenWidth) {
-        return getBitmapScaledToDisplay(file, screenHeight, screenWidth, false);
-    }
-
-    /**
-     * Scales image according to the given display
-     *
-     * @param file           containing the image
-     * @param screenHeight   height of the display
-     * @param screenWidth    width of the display
-     * @param upscaleEnabled determines whether the image should be up-scaled or not
-     *                       if the window size is greater than the image size
-     * @return scaled bitmap
-     */
-    public static Bitmap getBitmapScaledToDisplay(File file, int screenHeight, int screenWidth, boolean upscaleEnabled) {
-        // Determine image size of file
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inJustDecodeBounds = true;
-        getBitmap(file.getAbsolutePath(), options);
-
-        Bitmap bitmap;
-        double scale;
-        if (upscaleEnabled) {
-            // Load full size bitmap image
-            options = new BitmapFactory.Options();
-            options.inInputShareable = true;
-            options.inPurgeable = true;
-            bitmap = getBitmap(file.getAbsolutePath(), options);
-
-            double heightScale = ((double) (options.outHeight)) / screenHeight;
-            double widthScale = ((double) options.outWidth) / screenWidth;
-            scale = Math.max(widthScale, heightScale);
-
-            double newHeight = Math.ceil(options.outHeight / scale);
-            double newWidth = Math.ceil(options.outWidth / scale);
-
-            bitmap = Bitmap.createScaledBitmap(bitmap, (int) newWidth, (int) newHeight, false);
-        } else {
-            int heightScale = options.outHeight / screenHeight;
-            int widthScale = options.outWidth / screenWidth;
-
-            // Powers of 2 work faster, sometimes, according to the doc.
-            // We're just doing closest size that still fills the screen.
-            scale = Math.max(widthScale, heightScale);
-
-            // get bitmap with scale ( < 1 is the same as 1)
-            options = new BitmapFactory.Options();
-            options.inInputShareable = true;
-            options.inPurgeable = true;
-            options.inSampleSize = (int) scale;
-            bitmap = getBitmap(file.getAbsolutePath(), options);
-        }
-
-        if (bitmap != null) {
-            Timber.i("Screen is %dx%d.  Image has been scaled down by %f to %dx%d",
-                    screenHeight, screenWidth, scale, bitmap.getHeight(), bitmap.getWidth());
-        }
-        return bitmap;
     }
 
     public static String copyFile(File sourceFile, File destFile) {
@@ -257,17 +119,16 @@ public class FileUtils {
             if (errorMessage != null) {
                 try {
                     Thread.sleep(500);
-                    Timber.e("Retrying to copy the file after 500ms: %s",
-                            sourceFile.getAbsolutePath());
+                    Timber.e(new Error("Retrying to copy the file after 500ms: " + sourceFile.getAbsolutePath()));
                     errorMessage = actualCopy(sourceFile, destFile);
                 } catch (InterruptedException e) {
-                    Timber.e(e);
+                    Timber.i(e);
                 }
             }
             return errorMessage;
         } else {
             String msg = "Source file does not exist: " + sourceFile.getAbsolutePath();
-            Timber.e(msg);
+            Timber.e(new Error(msg));
             return msg;
         }
     }
@@ -308,7 +169,7 @@ public class FileUtils {
      * If the form definition contains a submission block, any or all of submission URI, base 64 RSA
      * public key, auto-delete and auto-send may be included.
      */
-    public static HashMap<String, String> getMetadataFromFormDefinition(File formDefinitionXml) {
+    public static HashMap<String, String> getMetadataFromFormDefinition(File formDefinitionXml) throws XFormParser.ParseException {
         FormDef formDef = XFormUtils.getFormFromFormXml(formDefinitionXml.getAbsolutePath(), "jr://file/" + LAST_SAVED_FILENAME);
 
         final HashMap<String, String> fields = new HashMap<>();
@@ -316,7 +177,7 @@ public class FileUtils {
         fields.put(TITLE, formDef.getTitle());
         fields.put(FORMID, formDef.getMainInstance().getRoot().getAttributeValue(null, "id"));
         String version = formDef.getMainInstance().getRoot().getAttributeValue(null, "version");
-        if (version != null && version.trim().isEmpty()) {
+        if (version != null && StringUtils.isBlank(version)) {
             version = null;
         }
         fields.put(VERSION, version);
@@ -427,10 +288,10 @@ public class FileUtils {
         if (file != null && file.exists()) {
             // remove garbage
             if (!file.delete()) {
-                Timber.w("%s will be deleted upon exit.", file.getAbsolutePath());
+                Timber.d("%s will be deleted upon exit.", file.getAbsolutePath());
                 file.deleteOnExit();
             } else {
-                Timber.w("%s has been deleted.", file.getAbsolutePath());
+                Timber.d("%s has been deleted.", file.getAbsolutePath());
             }
         }
     }
@@ -479,7 +340,7 @@ public class FileUtils {
         File lastSavedFile = getLastSavedFile(formXml);
 
         if (!lastSavedFile.exists()) {
-            write(lastSavedFile, STUB_XML.getBytes(Charset.forName("UTF-8")));
+            write(lastSavedFile, STUB_XML.getBytes(StandardCharsets.UTF_8));
         }
 
         return "jr://file/" + LAST_SAVED_FILENAME;
@@ -490,11 +351,11 @@ public class FileUtils {
      */
     public static void checkMediaPath(File mediaDir) {
         if (mediaDir.exists() && mediaDir.isFile()) {
-            Timber.e("The media folder is already there and it is a FILE!! We will need to delete it and create a folder instead");
+            Timber.e(new Error("The media folder is already there and it is a FILE!! We will need to delete it and create a folder instead"));
             boolean deleted = mediaDir.delete();
             if (!deleted) {
                 throw new RuntimeException(
-                        TranslationHandler.getString(Collect.getInstance(), R.string.fs_delete_media_path_if_file_error,
+                        getLocalizedString(Collect.getInstance(), org.odk.collect.strings.R.string.fs_delete_media_path_if_file_error,
                                 mediaDir.getAbsolutePath()));
             }
         }
@@ -503,7 +364,7 @@ public class FileUtils {
         boolean createdOrExisted = createFolder(mediaDir.getAbsolutePath());
         if (!createdOrExisted) {
             throw new RuntimeException(
-                    TranslationHandler.getString(Collect.getInstance(), R.string.fs_create_media_folder_error,
+                    getLocalizedString(Collect.getInstance(), org.odk.collect.strings.R.string.fs_create_media_folder_error,
                             mediaDir.getAbsolutePath()));
         }
     }
@@ -519,53 +380,6 @@ public class FileUtils {
         }
 
         deleteAndReport(tempMediaFolder);
-    }
-
-    public static void moveMediaFiles(String tempMediaPath, File formMediaPath) throws IOException {
-        File tempMediaFolder = new File(tempMediaPath);
-        File[] mediaFiles = tempMediaFolder.listFiles();
-        if (mediaFiles == null || mediaFiles.length == 0) {
-            deleteAndReport(tempMediaFolder);
-        } else {
-            for (File mediaFile : mediaFiles) {
-                org.apache.commons.io.FileUtils.moveFileToDirectory(mediaFile, formMediaPath, true);
-            }
-            deleteAndReport(tempMediaFolder);
-        }
-    }
-
-    public static void saveBitmapToFile(Bitmap bitmap, String path) {
-        final Bitmap.CompressFormat compressFormat = path.toLowerCase(Locale.getDefault()).endsWith(".png") ?
-                Bitmap.CompressFormat.PNG : Bitmap.CompressFormat.JPEG;
-
-        try (FileOutputStream out = new FileOutputStream(path)) {
-            bitmap.compress(compressFormat, 100, out);
-        } catch (Exception e) {
-            Timber.e(e);
-        }
-    }
-
-    /*
-    This method is used to avoid OutOfMemoryError exception during loading an image.
-    If the exception occurs we catch it and try to load a smaller image.
-     */
-    public static Bitmap getBitmap(String path, BitmapFactory.Options originalOptions) {
-        BitmapFactory.Options newOptions = new BitmapFactory.Options();
-        newOptions.inSampleSize = originalOptions.inSampleSize;
-        if (newOptions.inSampleSize <= 0) {
-            newOptions.inSampleSize = 1;
-        }
-
-        Bitmap bitmap;
-        try {
-            bitmap = BitmapFactory.decodeFile(path, originalOptions);
-        } catch (OutOfMemoryError e) {
-            Timber.i(e);
-            newOptions.inSampleSize++;
-            return getBitmap(path, newOptions);
-        }
-
-        return bitmap;
     }
 
     public static byte[] read(File file) {
@@ -615,44 +429,8 @@ public class FileUtils {
         intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
     }
 
-    /**
-     * Grants read permissions to a content URI added to the specified Intent.
-     *
-     * See {@link #grantFileReadPermissions(Intent, Uri, Context)} for details.
-     */
-    public static void grantFileReadPermissions(Intent intent, Uri uri, Context context) {
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    }
-
-    /** Uses the /sdcard symlink to shorten a path, if it's valid to do so. */
     @SuppressWarnings("PMD.DoNotHardCodeSDCard")
-    public static String simplifyPath(File file) {
-        if (new StorageStateProvider().isScopedStorageUsed()) {
-            return file.getAbsolutePath();
-        } else {
-            // The symlink at /sdcard points to the same location as the storage
-            // path returned by getExternalStorageDirectory() on every Android
-            // device and emulator as far as we know; but, just to be certain
-            // that we don't lie to the user, we'll confirm that's really true.
-            if (!isSdcardSymlinkChecked) {
-                checkIfSdcardSymlinkSameAsExternalStorageDirectory();
-                isSdcardSymlinkChecked = true;  // this check is expensive; only do it once
-            }
-            if (isSdcardSymlinkSameAsExternalStorageDirectory) {
-                // They point to the same place, so it's safe to replace the longer
-                // storage path with the short symlink.
-                String storagePath = Environment.getExternalStorageDirectory().getAbsolutePath();
-                String path = file.getAbsolutePath();
-                if (path.startsWith(storagePath + "/")) {
-                    return "/sdcard" + path.substring(storagePath.length());
-                }
-            }
-            return file.getAbsolutePath();
-        }
-    }
-
-    @SuppressWarnings("PMD.DoNotHardCodeSDCard")
-    public static String simplifyScopedStoragePath(String path) {
+    public static String expandAndroidStoragePath(String path) {
         if (path != null && path.startsWith("/storage/emulated/0/")) {
             return "/sdcard/" + path.substring("/storage/emulated/0/".length());
         }
@@ -660,68 +438,162 @@ public class FileUtils {
         return path;
     }
 
-    /** Checks whether /sdcard points to the same place as getExternalStorageDirectory(). */
-    @SuppressWarnings("PMD.DoNotHardCodeSDCard")
-    @SuppressFBWarnings(
-        value = "DMI_HARDCODED_ABSOLUTE_FILENAME",
-        justification = "The purpose of this function is to test this specific path."
-    )
-    private static void checkIfSdcardSymlinkSameAsExternalStorageDirectory() {
-        try {
-            // createTempFile() guarantees a randomly named file that did not previously exist.
-            File shortPathFile = File.createTempFile("odk", null, new File("/sdcard"));
-            try {
-                String name = shortPathFile.getName();
-                File longPathFile = new File(Environment.getExternalStorageDirectory(), name);
+    public static String getMimeType(File file) {
+        String extension = MimeTypeMap.getFileExtensionFromUrl(file.getAbsolutePath());
+        String mimeType = extension != null ? MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) : null;
 
-                // If we delete the file via one path and the file disappears at the
-                // other path, then we know that both paths point to the same place.
-                if (shortPathFile.exists() && longPathFile.exists()) {
-                    longPathFile.delete();
-                    if (!shortPathFile.exists()) {
-                        isSdcardSymlinkSameAsExternalStorageDirectory = true;
-                        return;
-                    }
+        if (mimeType == null || mimeType.isEmpty()) {
+            FileNameMap fileNameMap = URLConnection.getFileNameMap();
+            mimeType = fileNameMap.getContentTypeFor(file.getAbsolutePath());
+        }
+
+        if (mimeType == null || mimeType.isEmpty()) {
+            mimeType = URLConnection.guessContentTypeFromName(file.getName());
+        }
+
+        return mimeType;
+    }
+
+    public static List<File> listFiles(File file) {
+        if (file != null && file.exists()) {
+            return asList(file.listFiles());
+        } else {
+            return new ArrayList<>();
+        }
+    }
+
+    public static String getFilenameError(String filename) {
+        String possiblyRestricted = "?:\"*|/\\<>\u0000";
+        boolean containsAt = filename.contains("@");
+        boolean containsNonAscii = CharMatcher.ascii().matchesAllOf(filename);
+        boolean containsPossiblyRestricted = CharMatcher.anyOf(possiblyRestricted).matchesAnyOf(possiblyRestricted);
+        return "Problem with project name file. Contains @: " + containsAt + ", Contains non-ascii: " + containsNonAscii + ", Contains restricted: " + containsPossiblyRestricted;
+    }
+
+    /**
+     * Common routine to take a downloaded document save the contents in the file
+     * 'file'.
+     * <p>
+     * The file is saved into a temp folder and is moved to the final place if everything
+     * is okay, so that garbage is not left over on cancel.
+     */
+    public static void interuptablyWriteFile(InputStream inputStream, File destinationFile, File tempDir, OngoingWorkListener listener)
+            throws IOException, InterruptedException {
+
+        File tempFile = File.createTempFile(
+                destinationFile.getName(),
+                ".tempDownload",
+                tempDir
+        );
+
+        // WiFi network connections can be renegotiated during a large download sequence.
+        // This will cause intermittent download failures.  Silently retry once after each
+        // failure.  Only if there are two consecutive failures do we abort.
+        boolean success = false;
+        int attemptCount = 0;
+        final int maxAttemptCount = 2;
+        while (!success && ++attemptCount <= maxAttemptCount) {
+            // write connection to file
+            InputStream is = null;
+            OutputStream os = null;
+
+            try {
+                is = inputStream;
+                os = new FileOutputStream(tempFile);
+
+                byte[] buf = new byte[4096];
+                int len;
+                while ((len = is.read(buf)) > 0 && (listener == null || !listener.isCancelled())) {
+                    os.write(buf, 0, len);
+                }
+                os.flush();
+                success = true;
+
+            } catch (Exception e) {
+                Timber.e(e);
+                // silently retry unless this is the last attempt,
+                // in which case we rethrow the exception.
+
+                FileUtils.deleteAndReport(tempFile);
+
+                if (attemptCount == maxAttemptCount) {
+                    throw e;
                 }
             } finally {
-                shortPathFile.delete();
+                if (os != null) {
+                    try {
+                        os.close();
+                    } catch (Exception e) {
+                        Timber.e(e);
+                    }
+                }
+                if (is != null) {
+                    try {
+                        // ensure stream is consumed...
+                        final long count = 1024L;
+                        while (is.skip(count) == count) {
+                            // skipping to the end of the http entity
+                        }
+                    } catch (Exception e) {
+                        // no-op
+                    }
+                    try {
+                        is.close();
+                    } catch (Exception e) {
+                        Timber.w(e);
+                    }
+                }
             }
-        } catch (IOException e) { /* ignore */ }
-        isSdcardSymlinkSameAsExternalStorageDirectory = false;
-    }
 
-    /** Iterates over all directories and files under a root path. */
-    public static Iterable<File> walk(File root) {
-        return () -> new Walker(root, true);
-    }
-
-    public static Iterable<File> walkBreadthFirst(File root) {
-        return () -> new Walker(root, false);
-    }
-
-    /** An iterator that walks over all the directories and files under a given path. */
-    private static class Walker implements Iterator<File> {
-        private final List<File> queue = new ArrayList<>();
-        private final boolean depthFirst;
-
-        Walker(File root, boolean depthFirst) {
-            queue.add(root);
-            this.depthFirst = depthFirst;
+            if (listener != null && listener.isCancelled()) {
+                FileUtils.deleteAndReport(tempFile);
+                throw new InterruptedException();
+            }
         }
 
-        @Override public boolean hasNext() {
-            return !queue.isEmpty();
-        }
+        Timber.d("Completed downloading of %s. It will be moved to the proper path...", tempFile.getAbsolutePath());
 
-        @Override public File next() {
-            if (queue.isEmpty()) {
-                throw new NoSuchElementException();
-            }
-            File next = queue.remove(0);
-            if (next.isDirectory()) {
-                queue.addAll(depthFirst ? 0 : queue.size(), Arrays.asList(next.listFiles()));
-            }
-            return next;
+        FileUtils.deleteAndReport(destinationFile);
+
+        String errorMessage = FileUtils.copyFile(tempFile, destinationFile);
+
+        if (destinationFile.exists()) {
+            Timber.d("Copied %s over %s", tempFile.getAbsolutePath(), destinationFile.getAbsolutePath());
+            FileUtils.deleteAndReport(tempFile);
+        } else {
+            String msg = Collect.getInstance().getString(org.odk.collect.strings.R.string.fs_file_copy_error,
+                    tempFile.getAbsolutePath(), destinationFile.getAbsolutePath(), errorMessage);
+            throw new RuntimeException(msg);
+        }
+    }
+
+    public static void copyFileFromAssets(Context context, String fileDestPath, String fileSourcePath) throws IOException {
+        copyStreamToPath(getAssetAsStream(context, fileSourcePath), fileDestPath);
+    }
+
+    public static File copyFileFromResources(String fileSourcePath, File fileDest) throws IOException {
+        copyStreamToPath(getResourceAsStream(fileSourcePath), fileDest.getAbsolutePath());
+        return fileDest;
+    }
+
+    public static void copyFileFromResources(String fileSourcePath, String fileDestPath) throws IOException {
+        copyStreamToPath(getResourceAsStream(fileSourcePath), fileDestPath);
+    }
+
+    @NonNull
+    public static InputStream getAssetAsStream(Context context, String fileSourcePath) throws IOException {
+        return context.getAssets().open(fileSourcePath);
+    }
+
+    @Nullable
+    public static InputStream getResourceAsStream(String fileSourcePath) {
+        return FileUtils.class.getResourceAsStream("/" + fileSourcePath);
+    }
+
+    private static void copyStreamToPath(InputStream inputStream, String fileDestPath) throws IOException {
+        try (InputStream input = inputStream;
+             OutputStream output = new FileOutputStream(fileDestPath)) {
+            IOUtils.copy(input, output);
         }
     }
 }

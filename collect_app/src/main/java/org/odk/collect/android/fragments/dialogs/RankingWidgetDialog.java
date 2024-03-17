@@ -16,17 +16,11 @@
 
 package org.odk.collect.android.fragments.dialogs;
 
+import static org.odk.collect.android.utilities.ViewUtils.pxFromDp;
+
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
-import androidx.fragment.app.DialogFragment;
-import androidx.core.widget.NestedScrollView;
-import androidx.appcompat.app.AlertDialog.Builder;
-import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.ItemTouchHelper;
-import androidx.recyclerview.widget.ItemTouchHelper.Callback;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -34,15 +28,24 @@ import android.widget.LinearLayout;
 import android.widget.LinearLayout.LayoutParams;
 import android.widget.TextView;
 
-import org.javarosa.core.model.FormIndex;
+import androidx.core.widget.NestedScrollView;
+import androidx.fragment.app.DialogFragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.ItemTouchHelper.Callback;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import org.javarosa.core.model.SelectChoice;
+import org.javarosa.form.api.FormEntryPrompt;
 import org.jetbrains.annotations.NotNull;
 import org.odk.collect.android.R;
-import org.odk.collect.android.R.string;
 import org.odk.collect.android.adapters.RankingListAdapter;
 import org.odk.collect.android.fragments.viewmodels.RankingViewModel;
-import org.odk.collect.android.utilities.QuestionFontSizeUtils;
 import org.odk.collect.android.utilities.RankingItemTouchHelperCallback;
+import org.odk.collect.android.widgets.utilities.QuestionFontSizeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +54,7 @@ public class RankingWidgetDialog extends DialogFragment {
     private RankingListener listener;
     private RankingListAdapter rankingListAdapter;
     private List<SelectChoice> items;
-    private FormIndex formIndex;
+    private FormEntryPrompt formEntryPrompt;
     private RankingViewModel viewModel;
 
     public interface RankingListener {
@@ -61,9 +64,9 @@ public class RankingWidgetDialog extends DialogFragment {
     public RankingWidgetDialog() {
     }
 
-    public RankingWidgetDialog(List<SelectChoice> items, FormIndex formIndex) {
+    public RankingWidgetDialog(List<SelectChoice> items, FormEntryPrompt formEntryPrompt) {
         this.items = new ArrayList<>(items);
-        this.formIndex = formIndex;
+        this.formEntryPrompt = formEntryPrompt;
     }
 
     @Override
@@ -72,7 +75,7 @@ public class RankingWidgetDialog extends DialogFragment {
         if (context instanceof RankingListener) {
             listener = (RankingListener) context;
         }
-        viewModel = new ViewModelProvider(this, new RankingViewModel.Factory(items, formIndex)).get(RankingViewModel.class);
+        viewModel = new ViewModelProvider(this, new RankingViewModel.Factory(items, formEntryPrompt)).get(RankingViewModel.class);
         if (viewModel.getItems() == null) {
             dismiss();
         }
@@ -80,13 +83,13 @@ public class RankingWidgetDialog extends DialogFragment {
 
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
-        return new Builder(getActivity())
+        return new MaterialAlertDialogBuilder(getActivity())
                 .setView(setUpRankingLayout())
-                .setPositiveButton(string.ok, (dialog, id) -> {
+                .setPositiveButton(org.odk.collect.strings.R.string.ok, (dialog, id) -> {
                     listener.onRankingChanged(rankingListAdapter.getItems());
                     dismiss();
                 })
-                .setNegativeButton(string.cancel, (dialog, id) -> dismiss())
+                .setNegativeButton(org.odk.collect.strings.R.string.cancel, (dialog, id) -> dismiss())
                 .create();
     }
 
@@ -95,7 +98,12 @@ public class RankingWidgetDialog extends DialogFragment {
         rankingLayout.setOrientation(LinearLayout.HORIZONTAL);
         rankingLayout.addView(setUpPositionsLayout());
         rankingLayout.addView(setUpRecyclerView());
-        rankingLayout.setPadding(10, 0, 10, 0);
+
+        float standardMargin = requireContext()
+                .getResources()
+                .getDimension(org.odk.collect.androidshared.R.dimen.margin_standard);
+        int standardMarginPx = pxFromDp(requireContext(), standardMargin);
+        rankingLayout.setPadding(standardMarginPx, standardMarginPx, standardMarginPx, standardMarginPx);
 
         NestedScrollView scrollView = new NestedScrollView(getContext());
         scrollView.addView(rankingLayout);
@@ -122,7 +130,7 @@ public class RankingWidgetDialog extends DialogFragment {
     }
 
     private RecyclerView setUpRecyclerView() {
-        rankingListAdapter = new RankingListAdapter(viewModel.getItems(), viewModel.getFormIndex());
+        rankingListAdapter = new RankingListAdapter(viewModel.getItems(), viewModel.getFormEntryPrompt());
 
         RecyclerView recyclerView = new RecyclerView(getContext());
         recyclerView.setHasFixedSize(true);

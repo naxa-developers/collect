@@ -1,19 +1,16 @@
 package org.odk.collect.android.formentry.backgroundlocation;
 
+import static org.odk.collect.settings.keys.ProjectKeys.KEY_BACKGROUND_LOCATION;
+
 import androidx.annotation.NonNull;
 import androidx.lifecycle.ViewModel;
-import androidx.lifecycle.ViewModelProvider;
 
-import org.odk.collect.android.activities.FormEntryActivity;
-import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.location.client.GoogleFusedLocationClient;
-import org.odk.collect.android.preferences.GeneralSharedPreferences;
-
-import static org.odk.collect.android.preferences.GeneralKeys.KEY_BACKGROUND_LOCATION;
+import org.odk.collect.android.activities.FormFillingActivity;
+import org.odk.collect.shared.settings.Settings;
 
 /**
  * Ensures that background location tracking continues throughout the activity lifecycle. Builds
- * location-related dependency, receives activity events from #{@link FormEntryActivity} and
+ * location-related dependency, receives activity events from #{@link FormFillingActivity} and
  * forwards those events to the location manager.
  *
  * The current goal is to keep this component very thin but this may evolve as it is involved in
@@ -59,22 +56,8 @@ public class BackgroundLocationViewModel extends ViewModel {
         locationManager.locationProvidersChanged();
     }
 
-    public void backgroundLocationPreferenceToggled() {
-        GeneralSharedPreferences.getInstance().save(KEY_BACKGROUND_LOCATION, !GeneralSharedPreferences.getInstance().getBoolean(KEY_BACKGROUND_LOCATION, true));
+    public void backgroundLocationPreferenceToggled(Settings generalSettings) {
+        generalSettings.save(KEY_BACKGROUND_LOCATION, !generalSettings.getBoolean(KEY_BACKGROUND_LOCATION));
         locationManager.backgroundLocationPreferenceToggled();
-    }
-
-    public static class Factory implements ViewModelProvider.Factory {
-        @Override
-        public <T extends ViewModel> T create(@NonNull Class<T> modelClass) {
-            if (modelClass.equals(BackgroundLocationViewModel.class)) {
-                GoogleFusedLocationClient googleLocationClient = new GoogleFusedLocationClient(Collect.getInstance());
-
-                BackgroundLocationManager locationManager =
-                        new BackgroundLocationManager(googleLocationClient, new BackgroundLocationHelper());
-                return (T) new BackgroundLocationViewModel(locationManager);
-            }
-            return null;
-        }
     }
 }

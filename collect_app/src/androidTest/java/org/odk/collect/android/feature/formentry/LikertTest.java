@@ -1,21 +1,5 @@
 package org.odk.collect.android.feature.formentry;
 
-import android.Manifest;
-
-import androidx.test.espresso.intent.rule.IntentsTestRule;
-import androidx.test.rule.GrantPermissionRule;
-
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.RuleChain;
-import org.odk.collect.android.R;
-import org.odk.collect.android.activities.FormEntryActivity;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
-import org.odk.collect.android.support.FormLoadingUtils;
-
-import java.util.Collections;
-
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
@@ -28,23 +12,27 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.startsWith;
-import static org.odk.collect.android.support.CustomMatchers.withIndex;
+import static org.odk.collect.android.support.matchers.CustomMatchers.withIndex;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.RuleChain;
+import org.odk.collect.android.R;
+import org.odk.collect.android.support.rules.BlankFormTestRule;
+import org.odk.collect.android.support.rules.ResetStateRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
+
+import java.util.Collections;
 
 public class LikertTest {
     private static final String LIKERT_TEST_FORM = "likert_test.xml";
 
-    @Rule
-    public IntentsTestRule<FormEntryActivity> activityTestRule = FormLoadingUtils.getFormActivityTestRuleFor(LIKERT_TEST_FORM);
+    public BlankFormTestRule activityTestRule = new BlankFormTestRule(LIKERT_TEST_FORM, "All widgets likert icon", Collections.singletonList("famous.jpg"));
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.CAMERA)
-            )
+    public RuleChain copyFormChain = TestRuleChain.chain()
             .around(new ResetStateRule())
-            .around(new CopyFormRule(LIKERT_TEST_FORM, Collections.singletonList("famous.jpg"), true));
+            .around(activityTestRule);
 
     @Test
     public void allText_canClick() {

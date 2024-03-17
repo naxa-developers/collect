@@ -14,85 +14,118 @@
 
 package org.odk.collect.android.application;
 
+import static org.odk.collect.settings.keys.MetaKeys.KEY_GOOGLE_BUG_154855417_FIXED;
+
 import android.app.Application;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.os.StrictMode;
 
-import androidx.annotation.Nullable;
+import androidx.annotation.NonNull;
 import androidx.multidex.MultiDex;
 
 import org.jetbrains.annotations.NotNull;
 import org.odk.collect.android.BuildConfig;
-import org.odk.collect.android.application.initialization.ApplicationInitializer;
-import org.odk.collect.android.dao.FormsDao;
-import org.odk.collect.android.external.ExternalDataManager;
+import org.odk.collect.android.dynamicpreload.ExternalDataManager;
+import org.odk.collect.android.injection.DaggerUtils;
 import org.odk.collect.android.injection.config.AppDependencyComponent;
+import org.odk.collect.android.injection.config.CollectDrawDependencyModule;
+import org.odk.collect.android.injection.config.CollectGeoDependencyModule;
+import org.odk.collect.android.injection.config.CollectGoogleMapsDependencyModule;
+import org.odk.collect.android.injection.config.CollectOsmDroidDependencyModule;
+import org.odk.collect.android.injection.config.CollectProjectsDependencyModule;
+import org.odk.collect.android.injection.config.CollectSelfieCameraDependencyModule;
 import org.odk.collect.android.injection.config.DaggerAppDependencyComponent;
-import org.odk.collect.android.javarosawrapper.FormController;
-import org.odk.collect.android.preferences.PreferencesProvider;
-import org.odk.collect.android.storage.StoragePathProvider;
-import org.odk.collect.android.utilities.FileUtils;
+import org.odk.collect.android.utilities.FormsRepositoryProvider;
 import org.odk.collect.android.utilities.LocaleHelper;
-import org.odk.collect.strings.LocalizedApplication;
+import org.odk.collect.androidshared.data.AppState;
+import org.odk.collect.androidshared.data.StateStore;
+import org.odk.collect.androidshared.network.NetworkStateProvider;
+import org.odk.collect.androidshared.system.ExternalFilesUtils;
+import org.odk.collect.audiorecorder.AudioRecorderDependencyComponent;
+import org.odk.collect.audiorecorder.AudioRecorderDependencyComponentProvider;
+import org.odk.collect.audiorecorder.DaggerAudioRecorderDependencyComponent;
+import org.odk.collect.crashhandler.CrashHandler;
+import org.odk.collect.draw.DaggerDrawDependencyComponent;
+import org.odk.collect.draw.DrawDependencyComponent;
+import org.odk.collect.draw.DrawDependencyComponentProvider;
+import org.odk.collect.entities.DaggerEntitiesDependencyComponent;
+import org.odk.collect.entities.EntitiesDependencyComponent;
+import org.odk.collect.entities.EntitiesDependencyComponentProvider;
+import org.odk.collect.entities.EntitiesDependencyModule;
+import org.odk.collect.entities.EntitiesRepository;
+import org.odk.collect.forms.Form;
+import org.odk.collect.geo.DaggerGeoDependencyComponent;
+import org.odk.collect.geo.GeoDependencyComponent;
+import org.odk.collect.geo.GeoDependencyComponentProvider;
+import org.odk.collect.googlemaps.DaggerGoogleMapsDependencyComponent;
+import org.odk.collect.googlemaps.GoogleMapsDependencyComponent;
+import org.odk.collect.googlemaps.GoogleMapsDependencyComponentProvider;
+import org.odk.collect.location.LocationClient;
+import org.odk.collect.maps.layers.ReferenceLayerRepository;
+import org.odk.collect.osmdroid.DaggerOsmDroidDependencyComponent;
+import org.odk.collect.osmdroid.OsmDroidDependencyComponent;
+import org.odk.collect.osmdroid.OsmDroidDependencyComponentProvider;
+import org.odk.collect.projects.DaggerProjectsDependencyComponent;
+import org.odk.collect.projects.ProjectsDependencyComponent;
+import org.odk.collect.projects.ProjectsDependencyComponentProvider;
+import org.odk.collect.selfiecamera.DaggerSelfieCameraDependencyComponent;
+import org.odk.collect.selfiecamera.SelfieCameraDependencyComponent;
+import org.odk.collect.selfiecamera.SelfieCameraDependencyComponentProvider;
+import org.odk.collect.settings.SettingsProvider;
+import org.odk.collect.settings.keys.ProjectKeys;
+import org.odk.collect.shared.injection.ObjectProvider;
+import org.odk.collect.shared.injection.ObjectProviderHost;
+import org.odk.collect.shared.injection.SupplierObjectProvider;
+import org.odk.collect.shared.settings.Settings;
+import org.odk.collect.shared.strings.Md5;
+import org.odk.collect.strings.localization.LocalizedApplication;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.Locale;
 
-import javax.inject.Inject;
+@SuppressWarnings("PMD.CouplingBetweenObjects")
+public class Collect extends Application implements
+        LocalizedApplication,
+        AudioRecorderDependencyComponentProvider,
+        ProjectsDependencyComponentProvider,
+        GeoDependencyComponentProvider,
+        OsmDroidDependencyComponentProvider,
+        StateStore,
+        ObjectProviderHost,
+        EntitiesDependencyComponentProvider,
+        SelfieCameraDependencyComponentProvider,
+        GoogleMapsDependencyComponentProvider,
+        DrawDependencyComponentProvider {
 
-import static org.odk.collect.android.preferences.MetaKeys.KEY_GOOGLE_BUG_154855417_FIXED;
-
-public class Collect extends Application implements LocalizedApplication {
     public static String defaultSysLanguage;
     private static Collect singleton;
 
-    @Nullable
-    private FormController formController;
+    private final AppState appState = new AppState();
+    private final SupplierObjectProvider objectProvider = new SupplierObjectProvider();
+
     private ExternalDataManager externalDataManager;
     private AppDependencyComponent applicationComponent;
 
-    @Inject
-    ApplicationInitializer applicationInitializer;
-
-    @Inject
-    PreferencesProvider preferencesProvider;
-
-    public static Collect getInstance() {
-        return singleton;
-    }
+    private AudioRecorderDependencyComponent audioRecorderDependencyComponent;
+    private ProjectsDependencyComponent projectsDependencyComponent;
+    private GeoDependencyComponent geoDependencyComponent;
+    private OsmDroidDependencyComponent osmDroidDependencyComponent;
+    private EntitiesDependencyComponent entitiesDependencyComponent;
+    private SelfieCameraDependencyComponent selfieCameraDependencyComponent;
+    private GoogleMapsDependencyComponent googleMapsDependencyComponent;
+    private DrawDependencyComponent drawDependencyComponent;
 
     /**
-     * Predicate that tests whether a directory path might refer to an
-     * ODK Tables instance data directory (e.g., for media attachments).
+     * @deprecated we shouldn't have to reference a static singleton of the application. Code doing this
+     * should either have a {@link Context} instance passed to it (or have any references removed if
+     * possible).
      */
-    public static boolean isODKTablesInstanceDataDirectory(File directory) {
-        /*
-         * Special check to prevent deletion of files that
-         * could be in use by ODK Tables.
-         */
-        String dirPath = directory.getAbsolutePath();
-        StoragePathProvider storagePathProvider = new StoragePathProvider();
-        if (dirPath.startsWith(storagePathProvider.getStorageRootDirPath())) {
-            dirPath = dirPath.substring(storagePathProvider.getStorageRootDirPath().length());
-            String[] parts = dirPath.split(File.separatorChar == '\\' ? "\\\\" : File.separator);
-            // [appName, instances, tableId, instanceId ]
-            if (parts.length == 4 && parts[1].equals("instances")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Nullable
-    public FormController getFormController() {
-        return formController;
-    }
-
-    public void setFormController(@Nullable FormController controller) {
-        formController = controller;
+    @Deprecated
+    public static Collect getInstance() {
+        return singleton;
     }
 
     public ExternalDataManager getExternalDataManager() {
@@ -118,12 +151,17 @@ public class Collect extends Application implements LocalizedApplication {
         super.onCreate();
         singleton = this;
 
-        setupDagger();
-        applicationInitializer.initialize();
-        
-        fixGoogleBug154855417();
+        CrashHandler.install(this).launchApp(
+                () -> ExternalFilesUtils.testExternalFilesAccess(this),
+                () -> {
+                    setupDagger();
+                    DaggerUtils.getComponent(this).inject(this);
 
-        setupStrictMode();
+                    applicationComponent.applicationInitializer().initialize();
+                    fixGoogleBug154855417();
+                    setupStrictMode();
+                }
+        );
     }
 
     /**
@@ -133,14 +171,17 @@ public class Collect extends Application implements LocalizedApplication {
      */
     private void setupStrictMode() {
         if (BuildConfig.DEBUG) {
-            StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
+            StrictMode.ThreadPolicy.Builder policyBuilder = new StrictMode.ThreadPolicy.Builder()
                     .detectAll()
-                    .permitDiskReads()  // shared preferences are being read on main thread
-                    .penaltyLog()
-                    .build());
-            StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
-                    .detectAll()
-                    .penaltyLog()
+                    .permitDiskReads()  // shared preferences are being read on main thread (`GetAndSubmitFormTest`)
+                    .permitDiskWrites() // files are being created on the fly (`GetAndSubmitFormTest`)
+                    .penaltyDeath();
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                policyBuilder.permitUnbufferedIo(); // `ObjectInputStream#readObject` calls
+            }
+
+            StrictMode.setThreadPolicy(policyBuilder
                     .build());
         }
     }
@@ -150,7 +191,39 @@ public class Collect extends Application implements LocalizedApplication {
                 .application(this)
                 .build();
 
-        applicationComponent.inject(this);
+        audioRecorderDependencyComponent = DaggerAudioRecorderDependencyComponent.builder()
+                .application(this)
+                .build();
+
+        projectsDependencyComponent = DaggerProjectsDependencyComponent.builder()
+                .projectsDependencyModule(new CollectProjectsDependencyModule(applicationComponent.projectsRepository()))
+                .build();
+
+        selfieCameraDependencyComponent = DaggerSelfieCameraDependencyComponent.builder()
+                .selfieCameraDependencyModule(new CollectSelfieCameraDependencyModule(applicationComponent::permissionsChecker))
+                .build();
+
+        drawDependencyComponent = DaggerDrawDependencyComponent.builder()
+                .drawDependencyModule(new CollectDrawDependencyModule(applicationComponent))
+                .build();
+
+        // Mapbox dependencies
+        objectProvider.addSupplier(SettingsProvider.class, applicationComponent::settingsProvider);
+        objectProvider.addSupplier(NetworkStateProvider.class, applicationComponent::networkStateProvider);
+        objectProvider.addSupplier(ReferenceLayerRepository.class, applicationComponent::referenceLayerRepository);
+        objectProvider.addSupplier(LocationClient.class, applicationComponent::locationClient);
+    }
+
+    @NotNull
+    @Override
+    public AudioRecorderDependencyComponent getAudioRecorderDependencyComponent() {
+        return audioRecorderDependencyComponent;
+    }
+
+    @NotNull
+    @Override
+    public ProjectsDependencyComponent getProjectsDependencyComponent() {
+        return projectsDependencyComponent;
     }
 
     @Override
@@ -171,45 +244,33 @@ public class Collect extends Application implements LocalizedApplication {
     }
 
     /**
-     * Gets a unique, privacy-preserving identifier for the current form.
-     *
-     * @return md5 hash of the form title, a space, the form ID
-     */
-    public static String getCurrentFormIdentifierHash() {
-        FormController formController = getInstance().getFormController();
-        if (formController != null) {
-            return formController.getCurrentFormIdentifierHash();
-        }
-
-        return "";
-    }
-
-    /**
      * Gets a unique, privacy-preserving identifier for a form based on its id and version.
-     * @param formId id of a form
+     *
+     * @param formId      id of a form
      * @param formVersion version of a form
      * @return md5 hash of the form title, a space, the form ID
      */
     public static String getFormIdentifierHash(String formId, String formVersion) {
-        String formIdentifier = new FormsDao().getFormTitleForFormIdAndFormVersion(formId, formVersion) + " " + formId;
-        return FileUtils.getMd5Hash(new ByteArrayInputStream(formIdentifier.getBytes()));
+        Form form = new FormsRepositoryProvider(Collect.getInstance()).get().getLatestByFormIdAndVersion(formId, formVersion);
+
+        String formTitle = form != null ? form.getDisplayName() : "";
+
+        String formIdentifier = formTitle + " " + formId;
+        return Md5.getMd5Hash(new ByteArrayInputStream(formIdentifier.getBytes()));
     }
 
     // https://issuetracker.google.com/issues/154855417
     private void fixGoogleBug154855417() {
         try {
-            SharedPreferences metaSharedPreferences = preferencesProvider.getMetaSharedPreferences();
+            Settings metaSharedPreferences = applicationComponent.settingsProvider().getMetaSettings();
 
-            boolean hasFixedGoogleBug154855417 = metaSharedPreferences.getBoolean(KEY_GOOGLE_BUG_154855417_FIXED, false);
+            boolean hasFixedGoogleBug154855417 = metaSharedPreferences.getBoolean(KEY_GOOGLE_BUG_154855417_FIXED);
 
             if (!hasFixedGoogleBug154855417) {
                 File corruptedZoomTables = new File(getFilesDir(), "ZoomTables.data");
                 corruptedZoomTables.delete();
 
-                metaSharedPreferences
-                        .edit()
-                        .putBoolean(KEY_GOOGLE_BUG_154855417_FIXED, true)
-                        .apply();
+                metaSharedPreferences.save(KEY_GOOGLE_BUG_154855417_FIXED, true);
             }
         } catch (Exception ignored) {
             // ignored
@@ -219,6 +280,103 @@ public class Collect extends Application implements LocalizedApplication {
     @NotNull
     @Override
     public Locale getLocale() {
-        return new Locale(LocaleHelper.getLocaleCode(this));
+        if (this.applicationComponent != null) {
+            return LocaleHelper.getLocale(applicationComponent.settingsProvider().getUnprotectedSettings().getString(ProjectKeys.KEY_APP_LANGUAGE));
+        } else {
+            return getResources().getConfiguration().locale;
+        }
+    }
+
+    @NotNull
+    @Override
+    public AppState getState() {
+        return appState;
+    }
+
+    @NonNull
+    @Override
+    public GeoDependencyComponent getGeoDependencyComponent() {
+        if (geoDependencyComponent == null) {
+            geoDependencyComponent = DaggerGeoDependencyComponent.builder()
+                    .application(this)
+                    .geoDependencyModule(new CollectGeoDependencyModule(
+                            applicationComponent.mapFragmentFactory(),
+                            applicationComponent.locationClient(),
+                            applicationComponent.scheduler(),
+                            applicationComponent.permissionsChecker()
+                    ))
+                    .build();
+        }
+
+        return geoDependencyComponent;
+    }
+
+    @NonNull
+    @Override
+    public OsmDroidDependencyComponent getOsmDroidDependencyComponent() {
+        if (osmDroidDependencyComponent == null) {
+            osmDroidDependencyComponent = DaggerOsmDroidDependencyComponent.builder()
+                    .osmDroidDependencyModule(new CollectOsmDroidDependencyModule(
+                            applicationComponent.referenceLayerRepository(),
+                            applicationComponent.locationClient(),
+                            applicationComponent.settingsProvider()
+                    ))
+                    .build();
+        }
+
+        return osmDroidDependencyComponent;
+    }
+
+    @NonNull
+    @Override
+    public ObjectProvider getObjectProvider() {
+        return objectProvider;
+    }
+
+    @NonNull
+    @Override
+    public EntitiesDependencyComponent getEntitiesDependencyComponent() {
+        if (entitiesDependencyComponent == null) {
+            entitiesDependencyComponent = DaggerEntitiesDependencyComponent.builder()
+                    .entitiesDependencyModule(new EntitiesDependencyModule() {
+                        @NonNull
+                        @Override
+                        public EntitiesRepository providesEntitiesRepository() {
+                            String projectId = applicationComponent.currentProjectProvider().getCurrentProject().getUuid();
+                            return applicationComponent.entitiesRepositoryProvider().get(projectId);
+                        }
+                    })
+                    .build();
+        }
+
+        return entitiesDependencyComponent;
+    }
+
+    @NonNull
+    @Override
+    public SelfieCameraDependencyComponent getSelfieCameraDependencyComponent() {
+        return selfieCameraDependencyComponent;
+    }
+
+    @NonNull
+    @Override
+    public GoogleMapsDependencyComponent getGoogleMapsDependencyComponent() {
+        if (googleMapsDependencyComponent == null) {
+            googleMapsDependencyComponent = DaggerGoogleMapsDependencyComponent.builder()
+                    .googleMapsDependencyModule(new CollectGoogleMapsDependencyModule(
+                            applicationComponent.referenceLayerRepository(),
+                            applicationComponent.locationClient(),
+                            applicationComponent.settingsProvider()
+                    ))
+                    .build();
+        }
+
+        return googleMapsDependencyComponent;
+    }
+
+    @NonNull
+    @Override
+    public DrawDependencyComponent getDrawDependencyComponent() {
+        return drawDependencyComponent;
     }
 }

@@ -1,8 +1,5 @@
 package org.odk.collect.android.regression;
 
-import android.Manifest;
-
-import androidx.test.rule.GrantPermissionRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import org.junit.Rule;
@@ -10,12 +7,11 @@ import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
 import org.odk.collect.android.R;
-import org.odk.collect.android.support.CollectTestRule;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
+import org.odk.collect.android.support.rules.CollectTestRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
 import org.odk.collect.android.support.pages.FormEntryPage;
-import org.odk.collect.android.support.pages.GeneralSettingsPage;
 import org.odk.collect.android.support.pages.MainMenuPage;
+import org.odk.collect.android.support.pages.ProjectSettingsPage;
 
 //Issue NODK-237
 @RunWith(AndroidJUnit4.class)
@@ -24,73 +20,65 @@ public class FormManagementTest {
     public CollectTestRule rule = new CollectTestRule();
 
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_PHONE_STATE)
-            )
-            .around(new ResetStateRule())
-            .around(new CopyFormRule("OnePageFormValid2.xml"))
-            .around(new CopyFormRule("hints_textq.xml"))
+    public RuleChain copyFormChain = TestRuleChain.chain()
             .around(rule);
 
     @SuppressWarnings("PMD.AvoidCallingFinalize")
     @Test
     public void validationUponSwipe_ShouldDisplay() {
         //TestCase7,8
-        new MainMenuPage(rule)
+        rule.startAtMainMenu()
+                .copyForm("OnePageFormValid2.xml")
                 .startBlankForm("OnePageFormValid")
                 .inputText("Bla")
-                .swipeToNextQuestion()
-                .checkIsToastWithMessageDisplayed("Response length must be between 5 and 15")
+                .swipeToNextQuestionWithConstraintViolation("Response length must be between 5 and 15")
                 .clickOptionsIcon()
                 .clickGeneralSettings()
                 .openFormManagement()
                 .openConstraintProcessing()
-                .clickOnString(R.string.constraint_behavior_on_finalize)
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new FormEntryPage("OnePageFormValid", rule))
-                .swipeToNextQuestion()
+                .clickOnString(org.odk.collect.strings.R.string.constraint_behavior_on_finalize)
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new FormEntryPage("OnePageFormValid"))
                 .swipeToEndScreen()
-                .clickSaveAndExitWithError()
-                .checkIsToastWithMessageDisplayed("Response length must be between 5 and 15");
+                .clickSaveAndExitWithError("Response length must be between 5 and 15");
     }
 
     @Test
     public void guidanceForQuestion_ShouldDisplayAlways() {
         //TestCase10
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+        rule.startAtMainMenu()
+                .copyForm("hints_textq.xml")
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .openFormManagement()
                 .openShowGuidanceForQuestions()
-                .clickOnString(R.string.guidance_yes)
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
+                .clickOnString(org.odk.collect.strings.R.string.guidance_yes)
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new MainMenuPage())
                 .startBlankForm("hints textq")
                 .assertText("1 very very very very very very very very very very long text")
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
     @Test
     public void guidanceForQuestion_ShouldBeCollapsed() {
         //TestCase11
-        new MainMenuPage(rule)
-                .clickOnMenu()
-                .clickGeneralSettings()
+        rule.startAtMainMenu()
+                .copyForm("hints_textq.xml")
+                .openProjectSettingsDialog()
+                .clickSettings()
                 .openFormManagement()
                 .openShowGuidanceForQuestions()
-                .clickOnString(R.string.guidance_yes_collapsed)
-                .pressBack(new GeneralSettingsPage(rule))
-                .pressBack(new MainMenuPage(rule))
+                .clickOnString(org.odk.collect.strings.R.string.guidance_yes_collapsed)
+                .pressBack(new ProjectSettingsPage())
+                .pressBack(new MainMenuPage())
                 .startBlankForm("hints textq")
                 .checkIsIdDisplayed(R.id.help_icon)
                 .clickOnText("Hint 1")
                 .assertText("1 very very very very very very very very very very long text")
                 .swipeToEndScreen()
-                .clickSaveAndExit();
+                .clickFinalize();
     }
 
 }

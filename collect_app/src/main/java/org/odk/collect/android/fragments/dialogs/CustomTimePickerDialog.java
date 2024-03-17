@@ -3,14 +3,12 @@ package org.odk.collect.android.fragments.dialogs;
 import android.app.Dialog;
 import android.app.TimePickerDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.res.TypedArray;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.format.DateFormat;
 import android.util.AttributeSet;
-import android.view.Window;
 import android.widget.TimePicker;
 
 import androidx.annotation.NonNull;
@@ -20,7 +18,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import org.joda.time.DateTime;
 import org.joda.time.LocalDateTime;
-import org.odk.collect.android.R;
+import org.odk.collect.android.utilities.ThemeUtils;
 import org.odk.collect.android.widgets.utilities.DateTimeWidgetUtils;
 import org.odk.collect.android.widgets.viewmodels.DateTimeViewModel;
 
@@ -60,15 +58,21 @@ public class CustomTimePickerDialog extends DialogFragment {
         TimePickerDialog dialog = new TimePickerDialog(requireContext(), viewModel.getDialogTheme(), viewModel.getTimeSetListener(),
                 viewModel.getLocalDateTime().getHourOfDay(), viewModel.getLocalDateTime().getMinuteOfHour(), DateFormat.is24HourFormat(requireContext()));
 
-        dialog.setTitle(requireContext().getString(R.string.select_time));
+        dialog.setTitle(requireContext().getString(org.odk.collect.strings.R.string.select_time));
         fixSpinner(requireContext(), dialog, viewModel.getLocalDateTime().getHourOfDay(),
                 viewModel.getLocalDateTime().getMinuteOfHour(), DateFormat.is24HourFormat(requireContext()));
 
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        }
         return dialog;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // Needed because the TimePickerDialog doesn't pick up theme colors properly for some reason
+        TimePickerDialog dialog = (TimePickerDialog) getDialog();
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setTextColor(new ThemeUtils(getContext()).getColorPrimary());
+        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).setTextColor(new ThemeUtils(getContext()).getColorPrimary());
     }
 
     /**
@@ -83,7 +87,7 @@ public class CustomTimePickerDialog extends DialogFragment {
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.N) {
             try {
                 // Get the theme's android:timePickerMode
-                final int MODE_SPINNER = 2;
+                final int modeSpinner = 2;
                 Class<?> styleableClass = Class.forName("com.android.internal.R$styleable");
                 Field timePickerStyleableField = styleableClass.getField("TimePicker");
                 int[] timePickerStyleable = (int[]) timePickerStyleableField.get(null);
@@ -91,13 +95,13 @@ public class CustomTimePickerDialog extends DialogFragment {
                         android.R.attr.timePickerStyle, 0);
                 Field timePickerModeStyleableField = styleableClass.getField("TimePicker_timePickerMode");
                 int timePickerModeStyleable = timePickerModeStyleableField.getInt(null);
-                final int mode = a.getInt(timePickerModeStyleable, MODE_SPINNER);
+                final int mode = a.getInt(timePickerModeStyleable, modeSpinner);
                 a.recycle();
 
-                if (mode == MODE_SPINNER) {
+                if (mode == modeSpinner) {
                     Field field = findField(TimePickerDialog.class, TimePicker.class, "mTimePicker");
                     if (field == null) {
-                        Timber.e("Reflection failed: Couldn't find field 'mTimePicker'");
+                        Timber.e(new Error("Reflection failed: Couldn't find field 'mTimePicker'"));
                         return;
                     }
 
@@ -106,7 +110,7 @@ public class CustomTimePickerDialog extends DialogFragment {
                     Field delegateField = findField(TimePicker.class, delegateClass, "mDelegate");
 
                     if (delegateField == null) {
-                        Timber.e("Reflection failed: Couldn't find field 'mDelegate'");
+                        Timber.e(new Error("Reflection failed: Couldn't find field 'mDelegate'"));
                         return;
                     }
                     Object delegate = delegateField.get(timePicker);

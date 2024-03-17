@@ -1,39 +1,33 @@
 package org.odk.collect.android.widgets;
 
+import static org.odk.collect.android.utilities.ApplicationConstants.RequestCodes;
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import androidx.appcompat.app.AlertDialog;
-import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.graphics.Color;
-import android.graphics.Typeface;
 import android.view.View;
-import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.TableLayout;
-import android.widget.TextView;
+
+import androidx.appcompat.app.AlertDialog;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.StringData;
 import org.javarosa.core.model.osm.OSMTag;
 import org.javarosa.core.model.osm.OSMTagItem;
-import org.odk.collect.android.R;
-import org.odk.collect.android.application.Collect;
+import org.javarosa.form.api.FormEntryPrompt;
+import org.odk.collect.android.databinding.OsmWidgetAnswerBinding;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.formentry.questions.WidgetViewUtils;
 import org.odk.collect.android.javarosawrapper.FormController;
 import org.odk.collect.android.utilities.FileUtils;
 import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
-import org.odk.collect.android.widgets.interfaces.ButtonClickListener;
 import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
+import org.odk.collect.androidshared.system.IntentLauncher;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.odk.collect.android.formentry.questions.WidgetViewUtils.createSimpleButton;
-import static org.odk.collect.android.utilities.ApplicationConstants.RequestCodes;
 
 /**
  * Widget that allows the user to launch OpenMapKit to get an OSM Feature with a
@@ -42,30 +36,31 @@ import static org.odk.collect.android.utilities.ApplicationConstants.RequestCode
  * @author Nicholas Hallahan nhallahan@spatialdev.com
  */
 @SuppressLint("ViewConstructor")
-public class OSMWidget extends QuestionWidget implements WidgetDataReceiver, ButtonClickListener {
+public class OSMWidget extends QuestionWidget implements WidgetDataReceiver {
+    OsmWidgetAnswerBinding binding;
 
-    // button colors
-    private static final int OSM_GREEN = Color.rgb(126, 188, 111);
-    private static final int OSM_BLUE = Color.rgb(112, 146, 255);
+    public static final String FORM_ID = "FORM_ID";
+    public static final String INSTANCE_ID = "INSTANCE_ID";
+    public static final String INSTANCE_DIR = "INSTANCE_DIR";
+    public static final String FORM_FILE_NAME = "FORM_FILE_NAME";
+    public static final String OSM_EDIT_FILE_NAME = "OSM_EDIT_FILE_NAME";
 
-    final Button launchOpenMapKitButton;
-    private final String instanceDirectory;
-    private final TextView errorTextView;
-    private final TextView osmFileNameHeaderTextView;
-    final TextView osmFileNameTextView;
+    private final WaitingForDataRegistry waitingForDataRegistry;
+    private final IntentLauncher intentLauncher;
 
     private final List<OSMTag> osmRequiredTags;
     private final String instanceId;
-    private final int formId;
+    private final String instanceDirectory;
     private final String formFileName;
-    private final WaitingForDataRegistry waitingForDataRegistry;
-    private String osmFileName;
+    private final int formId;
 
-    public OSMWidget(Context context, QuestionDetails questionDetails, WaitingForDataRegistry waitingForDataRegistry) {
+    public OSMWidget(Context context, QuestionDetails questionDetails, WaitingForDataRegistry waitingForDataRegistry,
+                     IntentLauncher intentLauncher, FormController formController) {
         super(context, questionDetails);
-        this.waitingForDataRegistry = waitingForDataRegistry;
+        render();
 
-        FormController formController = Collect.getInstance().getFormController();
+        this.waitingForDataRegistry = waitingForDataRegistry;
+        this.intentLauncher = intentLauncher;
 
         formFileName = FileUtils.getFormBasenameFromMediaFolder(formController.getMediaFolder());
 
@@ -73,63 +68,32 @@ public class OSMWidget extends QuestionWidget implements WidgetDataReceiver, But
         instanceId = formController.getSubmissionMetadata().instanceId;
         formId = formController.getFormDef().getID();
 
-        errorTextView = new TextView(context);
-        errorTextView.setId(View.generateViewId());
-        errorTextView.setText(R.string.invalid_osm_data);
-
         // Determine the tags required
         osmRequiredTags = questionDetails.getPrompt().getQuestion().getOsmTags();
 
         // If an OSM File has already been saved, get the name.
-        osmFileName = questionDetails.getPrompt().getAnswerText();
+        String osmFileName = questionDetails.getPrompt().getAnswerText();
 
-        // Setup Launch OpenMapKit Button
-        launchOpenMapKitButton = createSimpleButton(getContext(), R.id.simple_button, getFormEntryPrompt().isReadOnly(), getAnswerFontSize(), this);
-
-        // Button Styling
         if (osmFileName != null) {
-            launchOpenMapKitButton.setBackgroundColor(OSM_BLUE);
+            binding.launchOpenMapKitButton.setText(getContext().getString(org.odk.collect.strings.R.string.recapture_osm));
+            binding.osmFileText.setText(osmFileName);
         } else {
-            launchOpenMapKitButton.setBackgroundColor(OSM_GREEN);
+            binding.osmFileHeaderText.setVisibility(View.GONE);
         }
-        launchOpenMapKitButton.setTextColor(Color.WHITE); // White text
-        if (osmFileName != null) {
-            launchOpenMapKitButton.setText(getContext().getString(R.string.recapture_osm));
+        binding.osmFileText.setVisibility(binding.osmFileText.getText().toString().isBlank() ? GONE : VISIBLE);
+    }
+
+    @Override
+    protected View onCreateAnswerView(Context context, FormEntryPrompt prompt, int answerFontSize) {
+        binding = OsmWidgetAnswerBinding.inflate(((Activity) context).getLayoutInflater());
+
+        if (prompt.isReadOnly()) {
+            binding.launchOpenMapKitButton.setVisibility(GONE);
         } else {
-            launchOpenMapKitButton.setText(getContext().getString(R.string.capture_osm));
+            binding.launchOpenMapKitButton.setOnClickListener(v -> onButtonClick());
         }
 
-        osmFileNameHeaderTextView = new TextView(context);
-        osmFileNameHeaderTextView.setId(View.generateViewId());
-        osmFileNameHeaderTextView.setTextSize(20);
-        osmFileNameHeaderTextView.setTypeface(null, Typeface.BOLD);
-        osmFileNameHeaderTextView.setPadding(10, 0, 0, 10);
-        osmFileNameHeaderTextView.setText(R.string.edited_osm_file);
-
-        // text view showing the resulting OSM file name
-        osmFileNameTextView = new TextView(context);
-        osmFileNameTextView.setId(View.generateViewId());
-        osmFileNameTextView.setTextSize(18);
-        osmFileNameTextView.setTypeface(null, Typeface.ITALIC);
-        if (osmFileName != null) {
-            osmFileNameTextView.setText(osmFileName);
-        } else {
-            osmFileNameHeaderTextView.setVisibility(View.GONE);
-        }
-        TableLayout.LayoutParams params = new TableLayout.LayoutParams();
-        params.setMargins(35, 30, 30, 35);
-        osmFileNameTextView.setLayoutParams(params);
-
-        // finish complex layout
-        LinearLayout answerLayout = new LinearLayout(getContext());
-        answerLayout.setOrientation(LinearLayout.VERTICAL);
-        answerLayout.addView(launchOpenMapKitButton);
-        answerLayout.addView(errorTextView);
-        answerLayout.addView(osmFileNameHeaderTextView);
-        answerLayout.addView(osmFileNameTextView);
-        addAnswerView(answerLayout, WidgetViewUtils.getStandardMargin(context));
-
-        errorTextView.setVisibility(View.GONE);
+        return binding.getRoot();
     }
 
     private void launchOpenMapKit() {
@@ -139,44 +103,40 @@ public class OSMWidget extends QuestionWidget implements WidgetDataReceiver, But
             launchIntent.setType("text/plain");
 
             //send form id
-            launchIntent.putExtra("FORM_ID", String.valueOf(formId));
+            launchIntent.putExtra(FORM_ID, String.valueOf(formId));
 
             //send instance id
-            launchIntent.putExtra("INSTANCE_ID", instanceId);
+            launchIntent.putExtra(INSTANCE_ID, instanceId);
 
             //send instance directory
-            launchIntent.putExtra("INSTANCE_DIR", instanceDirectory);
+            launchIntent.putExtra(INSTANCE_DIR, instanceDirectory);
 
             //send form file name
-            launchIntent.putExtra("FORM_FILE_NAME", formFileName);
+            launchIntent.putExtra(FORM_FILE_NAME, formFileName);
 
             //send OSM file name if there was a previous edit
-            if (osmFileName != null) {
-                launchIntent.putExtra("OSM_EDIT_FILE_NAME", osmFileName);
+            String osmFileName = binding.osmFileText.getText().toString();
+            if (!osmFileName.isEmpty()) {
+                launchIntent.putExtra(OSM_EDIT_FILE_NAME, osmFileName);
             }
 
             //send encode tag data structure to intent
             writeOsmRequiredTagsToExtras(launchIntent);
 
-            try {
-                waitingForDataRegistry.waitForData(getFormEntryPrompt().getIndex());
-                ((Activity) getContext()).startActivityForResult(launchIntent, RequestCodes.OSM_CAPTURE);
-            } catch (ActivityNotFoundException e) {
+            waitingForDataRegistry.waitForData(getFormEntryPrompt().getIndex());
+            intentLauncher.launchForResult((Activity) getContext(), launchIntent, RequestCodes.OSM_CAPTURE, () -> {
                 waitingForDataRegistry.cancelWaitingForData();
-                errorTextView.setVisibility(View.VISIBLE);
-            }
-
+                binding.errorText.setVisibility(View.VISIBLE);
+                return null;
+            });
         } catch (Exception ex) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-            builder.setTitle(R.string.alert);
-            builder.setMessage(R.string.install_openmapkit);
-            DialogInterface.OnClickListener okClickListener = new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int id) {
-                    //TODO: launch to app store?
-                }
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(getContext());
+            builder.setTitle(org.odk.collect.strings.R.string.alert);
+            builder.setMessage(org.odk.collect.strings.R.string.install_openmapkit);
+            DialogInterface.OnClickListener okClickListener = (dialog, id) -> {
+                //TODO: launch to app store?
             };
-
-            builder.setPositiveButton("Ok", okClickListener);
+            builder.setPositiveButton(getContext().getString(org.odk.collect.strings.R.string.ok), okClickListener);
             AlertDialog dialog = builder.create();
             dialog.show();
         }
@@ -185,40 +145,37 @@ public class OSMWidget extends QuestionWidget implements WidgetDataReceiver, But
     @Override
     public void setData(Object answer) {
         // show file name of saved osm data
-        osmFileName = (String) answer;
-        osmFileNameTextView.setText(osmFileName);
-        osmFileNameHeaderTextView.setVisibility(View.VISIBLE);
-        osmFileNameTextView.setVisibility(View.VISIBLE);
-
+        binding.osmFileText.setText((String) answer);
+        binding.osmFileText.setVisibility(binding.osmFileText.getText().toString().isBlank() ? GONE : VISIBLE);
+        binding.osmFileHeaderText.setVisibility(View.VISIBLE);
+        binding.launchOpenMapKitButton.setText(getContext().getString(org.odk.collect.strings.R.string.recapture_osm));
         widgetValueChanged();
     }
 
     @Override
     public IAnswerData getAnswer() {
-        String s = osmFileNameTextView.getText().toString();
-
-        return !s.isEmpty()
-                ? new StringData(s)
-                : null;
+        String osmFileName = binding.osmFileText.getText().toString();
+        return osmFileName.isEmpty() ? null : new StringData(osmFileName);
     }
 
     @Override
     public void clearAnswer() {
-        osmFileNameTextView.setText(null);
+        binding.osmFileText.setText(null);
+        binding.osmFileText.setVisibility(GONE);
+        binding.osmFileHeaderText.setVisibility(View.GONE);
+        binding.launchOpenMapKitButton.setText(getContext().getString(org.odk.collect.strings.R.string.capture_osm));
         widgetValueChanged();
     }
 
     @Override
-    public void onButtonClick(int buttonId) {
-        launchOpenMapKitButton.setBackgroundColor(OSM_BLUE);
-        errorTextView.setVisibility(View.GONE);
-        launchOpenMapKit();
+    public void setOnLongClickListener(OnLongClickListener l) {
+        binding.osmFileText.setOnLongClickListener(l);
+        binding.launchOpenMapKitButton.setOnLongClickListener(l);
     }
 
-    @Override
-    public void setOnLongClickListener(OnLongClickListener l) {
-        osmFileNameTextView.setOnLongClickListener(l);
-        launchOpenMapKitButton.setOnLongClickListener(l);
+    private void onButtonClick() {
+        binding.errorText.setVisibility(View.GONE);
+        launchOpenMapKit();
     }
 
     /**

@@ -14,24 +14,21 @@
 
 package org.odk.collect.android.widgets;
 
+import static org.odk.collect.android.utilities.ApplicationConstants.RequestCodes;
+
 import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.content.ActivityNotFoundException;
 import android.content.Context;
-import android.content.Intent;
 
 import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.IntegerData;
-import org.odk.collect.android.R;
-import org.odk.collect.android.external.ExternalAppsUtils;
+import org.odk.collect.android.dynamicpreload.ExternalAppsUtils;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
+import org.odk.collect.android.utilities.Appearances;
+import org.odk.collect.android.widgets.utilities.StringRequester;
 import org.odk.collect.android.widgets.utilities.StringWidgetUtils;
-import org.odk.collect.android.utilities.ToastUtils;
 import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
 
-import timber.log.Timber;
-
-import static org.odk.collect.android.utilities.ApplicationConstants.RequestCodes;
+import java.io.Serializable;
 
 /**
  * Launch an external app to supply an integer value. If the app
@@ -42,31 +39,32 @@ import static org.odk.collect.android.utilities.ApplicationConstants.RequestCode
 @SuppressLint("ViewConstructor")
 public class ExIntegerWidget extends ExStringWidget {
 
-    public ExIntegerWidget(Context context, QuestionDetails questionDetails, WaitingForDataRegistry waitingForDataRegistry) {
-        super(context, questionDetails, waitingForDataRegistry);
-        StringWidgetUtils.adjustEditTextAnswerToIntegerWidget(answerText, questionDetails.getPrompt());
+    public ExIntegerWidget(Context context, QuestionDetails questionDetails, WaitingForDataRegistry waitingForDataRegistry, StringRequester stringRequester) {
+        super(context, questionDetails, waitingForDataRegistry, stringRequester);
+
+        boolean useThousandSeparator = Appearances.useThousandSeparator(questionDetails.getPrompt());
+        Integer answer = StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(questionDetails.getPrompt().getAnswerValue());
+        binding.widgetAnswerText.setIntegerType(useThousandSeparator, answer);
     }
 
     @Override
-    protected void fireActivity(Intent i) throws ActivityNotFoundException {
-        i.putExtra(DATA_NAME, StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(getFormEntryPrompt().getAnswerValue()));
-        try {
-            ((Activity) getContext()).startActivityForResult(i, RequestCodes.EX_INT_CAPTURE);
-        } catch (SecurityException e) {
-            Timber.i(e);
-            ToastUtils.showLongToast(R.string.not_granted_permission);
-        }
+    protected Serializable getAnswerForIntent()  {
+        return StringWidgetUtils.getIntegerAnswerValueFromIAnswerData(getFormEntryPrompt().getAnswerValue());
+    }
+
+    @Override
+    protected int getRequestCode() {
+        return RequestCodes.EX_INT_CAPTURE;
     }
 
     @Override
     public IAnswerData getAnswer() {
-        return StringWidgetUtils.getIntegerData(answerText.getText().toString(), getFormEntryPrompt());
+        return StringWidgetUtils.getIntegerData(binding.widgetAnswerText.getAnswer(), getFormEntryPrompt());
     }
 
     @Override
     public void setData(Object answer) {
         IntegerData integerData = ExternalAppsUtils.asIntegerData(answer);
-        answerText.setText(integerData == null ? null : integerData.getValue().toString());
-        widgetValueChanged();
+        binding.widgetAnswerText.setAnswer(integerData == null ? null : integerData.getValue().toString());
     }
 }

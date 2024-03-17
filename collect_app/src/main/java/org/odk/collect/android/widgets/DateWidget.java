@@ -24,16 +24,17 @@ import org.javarosa.core.model.data.DateData;
 import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.form.api.FormEntryPrompt;
 import org.joda.time.LocalDateTime;
-import org.odk.collect.android.R;
 import org.odk.collect.android.databinding.DateWidgetAnswerBinding;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
 import org.odk.collect.android.logic.DatePickerDetails;
 import org.odk.collect.android.utilities.DateTimeUtils;
 import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
 import org.odk.collect.android.widgets.utilities.DateTimeWidgetUtils;
+import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
 
 @SuppressLint("ViewConstructor")
 public class DateWidget extends QuestionWidget implements WidgetDataReceiver {
+    private final WaitingForDataRegistry waitingForDataRegistry;
     DateWidgetAnswerBinding binding;
 
     private final DateTimeWidgetUtils widgetUtils;
@@ -41,9 +42,12 @@ public class DateWidget extends QuestionWidget implements WidgetDataReceiver {
     private LocalDateTime selectedDate;
     private DatePickerDetails datePickerDetails;
 
-    public DateWidget(Context context, QuestionDetails prompt, DateTimeWidgetUtils widgetUtils) {
+    public DateWidget(Context context, QuestionDetails prompt, DateTimeWidgetUtils widgetUtils, WaitingForDataRegistry waitingForDataRegistry) {
         super(context, prompt);
+        render();
+
         this.widgetUtils = widgetUtils;
+        this.waitingForDataRegistry = waitingForDataRegistry;
     }
 
     @Override
@@ -54,10 +58,8 @@ public class DateWidget extends QuestionWidget implements WidgetDataReceiver {
         if (prompt.isReadOnly()) {
             binding.dateButton.setVisibility(GONE);
         } else {
-            binding.dateButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, answerFontSize);
-
             binding.dateButton.setOnClickListener(v -> {
-                DateTimeWidgetUtils.setWidgetWaitingForData(prompt.getIndex());
+                waitingForDataRegistry.waitForData(prompt.getIndex());
                 widgetUtils.showDatePickerDialog(context, datePickerDetails, selectedDate);
             });
         }
@@ -77,7 +79,7 @@ public class DateWidget extends QuestionWidget implements WidgetDataReceiver {
 
     @Override
     public IAnswerData getAnswer() {
-        return binding.dateAnswerText.getText().equals(getContext().getString(R.string.no_date_selected))
+        return binding.dateAnswerText.getText().equals(getContext().getString(org.odk.collect.strings.R.string.no_date_selected))
                 ? null
                 : new DateData(selectedDate.toDate());
     }
@@ -98,7 +100,7 @@ public class DateWidget extends QuestionWidget implements WidgetDataReceiver {
     @Override
     public void clearAnswer() {
         selectedDate = DateTimeUtils.getCurrentDateTime();
-        binding.dateAnswerText.setText(R.string.no_date_selected);
+        binding.dateAnswerText.setText(org.odk.collect.strings.R.string.no_date_selected);
         widgetValueChanged();
     }
 
@@ -108,6 +110,7 @@ public class DateWidget extends QuestionWidget implements WidgetDataReceiver {
             selectedDate = DateTimeUtils.getSelectedDate((LocalDateTime) answer, LocalDateTime.now());
             binding.dateAnswerText.setText(DateTimeWidgetUtils.getDateTimeLabel(
                     selectedDate.toDate(), datePickerDetails, false, getContext()));
+            widgetValueChanged();
         }
     }
 }

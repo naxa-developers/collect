@@ -1,17 +1,16 @@
 package org.odk.collect.android.formentry.audit;
 
+import static org.odk.collect.shared.strings.StringUtils.isBlank;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import org.odk.collect.android.formentry.RequiresFormController;
 import org.odk.collect.android.javarosawrapper.FormController;
 
-import static org.odk.collect.android.utilities.StringUtils.isBlank;
-
-public class IdentityPromptViewModel extends ViewModel implements RequiresFormController {
+public class IdentityPromptViewModel extends ViewModel {
 
     private final MutableLiveData<Boolean> formEntryCancelled = new MutableLiveData<>(false);
     private final MutableLiveData<Boolean> requiresIdentity = new MutableLiveData<>(false);
@@ -26,7 +25,6 @@ public class IdentityPromptViewModel extends ViewModel implements RequiresFormCo
         updateRequiresIdentity();
     }
 
-    @Override
     public void formLoaded(@NonNull FormController formController) {
         this.formName = formController.getFormTitle();
         this.auditEventLogger = formController.getAuditEventLogger();

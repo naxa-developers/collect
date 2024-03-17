@@ -5,17 +5,17 @@ import android.content.DialogInterface;
 
 import androidx.appcompat.app.AlertDialog;
 
-import org.odk.collect.android.R;
-
 import static android.content.DialogInterface.BUTTON_NEGATIVE;
 import static android.content.DialogInterface.BUTTON_POSITIVE;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class AddRepeatDialog {
 
     private AddRepeatDialog() {}
 
     public static void show(Context context, String groupLabel, Listener listener) {
-        AlertDialog alertDialog = new AlertDialog.Builder(context).create();
+        AlertDialog alertDialog = new MaterialAlertDialogBuilder(context).create();
         DialogInterface.OnClickListener repeatListener = (dialog, i) -> {
             switch (i) {
                 case BUTTON_POSITIVE:
@@ -27,12 +27,12 @@ public class AddRepeatDialog {
             }
         };
 
-        alertDialog.setMessage(context.getString(R.string.add_repeat_question,
+        alertDialog.setMessage(context.getString(org.odk.collect.strings.R.string.add_repeat_question,
                 groupLabel));
 
-        alertDialog.setButton(BUTTON_POSITIVE, context.getString(R.string.add_repeat),
+        alertDialog.setButton(BUTTON_POSITIVE, context.getString(org.odk.collect.strings.R.string.add_repeat),
                 repeatListener);
-        alertDialog.setButton(BUTTON_NEGATIVE, context.getString(R.string.dont_add_repeat),
+        alertDialog.setButton(BUTTON_NEGATIVE, context.getString(org.odk.collect.strings.R.string.dont_add_repeat),
                 repeatListener);
 
         alertDialog.setCancelable(false);

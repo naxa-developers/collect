@@ -23,13 +23,12 @@ import android.view.View;
 import org.javarosa.core.model.data.IAnswerData;
 import org.javarosa.core.model.data.StringData;
 import org.javarosa.form.api.FormEntryPrompt;
-
-import org.odk.collect.android.R;
 import org.odk.collect.android.databinding.GeoWidgetAnswerBinding;
 import org.odk.collect.android.formentry.questions.QuestionDetails;
-import org.odk.collect.android.geo.MapConfigurator;
-import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
+import org.odk.collect.maps.MapConfigurator;
 import org.odk.collect.android.widgets.interfaces.GeoDataRequester;
+import org.odk.collect.android.widgets.interfaces.WidgetDataReceiver;
+import org.odk.collect.android.widgets.utilities.GeoWidgetUtils;
 import org.odk.collect.android.widgets.utilities.WaitingForDataRegistry;
 
 /**
@@ -47,6 +46,8 @@ public class GeoTraceWidget extends QuestionWidget implements WidgetDataReceiver
     public GeoTraceWidget(Context context, QuestionDetails questionDetails, WaitingForDataRegistry waitingForDataRegistry,
                           MapConfigurator mapConfigurator, GeoDataRequester geoDataRequester) {
         super(context, questionDetails);
+        render();
+
         this.waitingForDataRegistry = waitingForDataRegistry;
         this.mapConfigurator = mapConfigurator;
         this.geoDataRequester = geoDataRequester;
@@ -56,33 +57,33 @@ public class GeoTraceWidget extends QuestionWidget implements WidgetDataReceiver
     protected View onCreateAnswerView(Context context, FormEntryPrompt prompt, int answerFontSize) {
         binding = GeoWidgetAnswerBinding.inflate(((Activity) context).getLayoutInflater());
 
-        binding.simpleButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, answerFontSize);
         binding.geoAnswerText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, answerFontSize);
 
         binding.simpleButton.setOnClickListener(v -> {
             if (mapConfigurator.isAvailable(context)) {
-                geoDataRequester.requestGeoTrace(context, prompt, getAnswerText(), waitingForDataRegistry);
+                geoDataRequester.requestGeoTrace(prompt, getAnswerText(), waitingForDataRegistry);
             } else {
                 mapConfigurator.showUnavailableMessage(context);
             }
         });
 
-        String stringAnswer = prompt.getAnswerText();
+        String stringAnswer = GeoWidgetUtils.getGeoPolyAnswerToDisplay(prompt.getAnswerText());
         binding.geoAnswerText.setText(stringAnswer);
+        binding.geoAnswerText.setVisibility(binding.geoAnswerText.getText().toString().isBlank() ? GONE : VISIBLE);
 
         boolean dataAvailable = stringAnswer != null && !stringAnswer.isEmpty();
 
         if (getFormEntryPrompt().isReadOnly()) {
             if (dataAvailable) {
-                binding.simpleButton.setText(R.string.geotrace_view_read_only);
+                binding.simpleButton.setText(org.odk.collect.strings.R.string.geotrace_view_read_only);
             } else {
                 binding.simpleButton.setVisibility(View.GONE);
             }
         } else {
             if (dataAvailable) {
-                binding.simpleButton.setText(R.string.geotrace_view_change_location);
+                binding.simpleButton.setText(org.odk.collect.strings.R.string.geotrace_view_change_location);
             } else {
-                binding.simpleButton.setText(R.string.get_trace);
+                binding.simpleButton.setText(org.odk.collect.strings.R.string.get_trace);
             }
         }
 
@@ -103,7 +104,8 @@ public class GeoTraceWidget extends QuestionWidget implements WidgetDataReceiver
     @Override
     public void clearAnswer() {
         binding.geoAnswerText.setText(null);
-        binding.simpleButton.setText(R.string.get_trace);
+        binding.geoAnswerText.setVisibility(GONE);
+        binding.simpleButton.setText(org.odk.collect.strings.R.string.get_trace);
         widgetValueChanged();
     }
 
@@ -117,7 +119,8 @@ public class GeoTraceWidget extends QuestionWidget implements WidgetDataReceiver
     @Override
     public void setData(Object answer) {
         binding.geoAnswerText.setText(answer.toString());
-        binding.simpleButton.setText(answer.toString().isEmpty() ? R.string.get_trace : R.string.geotrace_view_change_location);
+        binding.geoAnswerText.setVisibility(binding.geoAnswerText.getText().toString().isBlank() ? GONE : VISIBLE);
+        binding.simpleButton.setText(answer.toString().isEmpty() ? org.odk.collect.strings.R.string.get_trace : org.odk.collect.strings.R.string.geotrace_view_change_location);
         widgetValueChanged();
     }
 

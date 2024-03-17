@@ -1,25 +1,37 @@
 package org.odk.collect.android.instrumented.tasks;
 
-import android.Manifest;
+import static org.mockito.Mockito.mock;
 
-import androidx.test.rule.GrantPermissionRule;
+import android.app.Application;
+import android.net.Uri;
 
+import androidx.test.core.app.ApplicationProvider;
+
+import org.javarosa.core.model.FormDef;
+import org.javarosa.form.api.FormEntryController;
+import org.javarosa.form.api.FormEntryModel;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
+import org.odk.collect.android.external.FormsContract;
+import org.odk.collect.android.injection.DaggerUtils;
+import org.odk.collect.android.injection.config.AppDependencyComponent;
 import org.odk.collect.android.storage.StoragePathProvider;
 import org.odk.collect.android.storage.StorageSubdirectory;
-import org.odk.collect.android.support.CopyFormRule;
-import org.odk.collect.android.support.ResetStateRule;
+import org.odk.collect.android.support.StorageUtils;
+import org.odk.collect.android.support.rules.RunnableRule;
+import org.odk.collect.android.support.rules.TestRuleChain;
 import org.odk.collect.android.tasks.FormLoaderTask;
+import org.odk.collect.android.tasks.FormLoaderTask.FormEntryControllerFactory;
+import org.odk.collect.android.utilities.FormsRepositoryProvider;
+import org.odk.collect.forms.Form;
+import org.odk.collect.projects.Project;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.notNullValue;
 
 public class FormLoaderTaskTest {
 
@@ -30,55 +42,39 @@ public class FormLoaderTaskTest {
     private static final String SIMPLE_SEARCH_EXTERNAL_CSV_FILE = "simple-search-external-csv-fruits.csv";
     private static final String SIMPLE_SEARCH_EXTERNAL_DB_FILE = "simple-search-external-csv-fruits.db";
 
+    private final FormEntryControllerFactory formEntryControllerFactory = new FormEntryControllerFactory() {
+        @Override
+        public FormEntryController create(FormDef formDef, File formMediaDir) {
+            return new FormEntryController(new FormEntryModel(formDef));
+        }
+    };
+
     @Rule
-    public RuleChain copyFormChain = RuleChain
-            .outerRule(GrantPermissionRule.grant(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ))
-            .around(new ResetStateRule())
-            .around(new CopyFormRule(SECONDARY_INSTANCE_EXTERNAL_CSV_FORM,
-                    Arrays.asList("external_csv_cities.csv", "external_csv_countries.csv", "external_csv_neighbourhoods.csv")))
-            .around(new CopyFormRule(SIMPLE_SEARCH_EXTERNAL_CSV_FORM, Collections.singletonList(SIMPLE_SEARCH_EXTERNAL_CSV_FILE)));
+    public RuleChain copyFormChain = TestRuleChain.chain()
+            .around(new RunnableRule(() -> {
+                try {
+                    // Set up demo project
+                    AppDependencyComponent component = DaggerUtils.getComponent(ApplicationProvider.<Application>getApplicationContext());
+                    component.projectsRepository().save(Project.Companion.getDEMO_PROJECT());
+                    component.currentProjectProvider().setCurrentProject(Project.DEMO_PROJECT_ID);
 
-    // Validate the use of CSV files as secondary instances accessed through "jr://file-csv"
-    @Test
-    public void loadFormWithSecondaryCSV() throws Exception {
-        final String formPath = storagePathProvider.getDirPath(StorageSubdirectory.FORMS) + File.separator + SECONDARY_INSTANCE_EXTERNAL_CSV_FORM;
-        FormLoaderTask formLoaderTask = new FormLoaderTask(formPath, null, null);
-        FormLoaderTask.FECWrapper wrapper = formLoaderTask.execute(formPath).get();
-        Assert.assertNotNull(wrapper);
-    }
-
-    // Validate the use of a CSV file externally accessed through search/pulldata
-    @Test
-    public void loadSearchFromExternalCSV() throws Exception {
-        final String formPath = storagePathProvider.getDirPath(StorageSubdirectory.FORMS) + File.separator + SIMPLE_SEARCH_EXTERNAL_CSV_FORM;
-        FormLoaderTask formLoaderTask = new FormLoaderTask(formPath, null, null);
-        FormLoaderTask.FECWrapper wrapper = formLoaderTask.execute(formPath).get();
-        assertThat(wrapper, notNullValue());
-    }
-
-    @Test
-    public void loadSearchFromexternalCsvLeavesFileUnchanged() throws Exception {
-        final String formPath = storagePathProvider.getDirPath(StorageSubdirectory.FORMS) + File.separator + SIMPLE_SEARCH_EXTERNAL_CSV_FORM;
-        FormLoaderTask formLoaderTask = new FormLoaderTask(formPath, null, null);
-        FormLoaderTask.FECWrapper wrapper = formLoaderTask.execute(formPath).get();
-        Assert.assertNotNull(wrapper);
-        Assert.assertNotNull(wrapper.getController());
-
-        File mediaFolder = wrapper.getController().getMediaFolder();
-        File importedCSV = new File(mediaFolder + File.separator + SIMPLE_SEARCH_EXTERNAL_CSV_FILE);
-        Assert.assertTrue("Expected the imported CSV file to remain unchanged", importedCSV.exists());
-    }
+                    StorageUtils.copyFormToDemoProject(SECONDARY_INSTANCE_EXTERNAL_CSV_FORM, Arrays.asList("external_csv_cities.csv", "external_csv_countries.csv", "external_csv_neighbourhoods.csv"), true);
+                    StorageUtils.copyFormToDemoProject(SIMPLE_SEARCH_EXTERNAL_CSV_FORM, Collections.singletonList(SIMPLE_SEARCH_EXTERNAL_CSV_FILE), true);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }));
 
     // Validate that importing external data multiple times does not fail due to side effects from import
     @Test
     public void loadSearchFromExternalCSVmultipleTimes() throws Exception {
-        final String formPath = storagePathProvider.getDirPath(StorageSubdirectory.FORMS) + File.separator + SIMPLE_SEARCH_EXTERNAL_CSV_FORM;
+        final String formPath = storagePathProvider.getOdkDirPath(StorageSubdirectory.FORMS) + File.separator + SIMPLE_SEARCH_EXTERNAL_CSV_FORM;
+        final Form form = new FormsRepositoryProvider(ApplicationProvider.getApplicationContext()).get().getOneByPath(formPath);
+        final Uri formUri = FormsContract.getUri("DEMO", form.getDbId());
+
         // initial load with side effects
-        FormLoaderTask formLoaderTask = new FormLoaderTask(formPath, null, null);
-        FormLoaderTask.FECWrapper wrapper = formLoaderTask.execute(formPath).get();
+        FormLoaderTask formLoaderTask = new FormLoaderTask(formUri, FormsContract.CONTENT_ITEM_TYPE, null, null, formEntryControllerFactory, mock());
+        FormLoaderTask.FECWrapper wrapper = formLoaderTask.executeSynchronously();
         Assert.assertNotNull(wrapper);
         Assert.assertNotNull(wrapper.getController());
 
@@ -88,8 +84,8 @@ public class FormLoaderTaskTest {
         long dbLastModified = dbFile.lastModified();
 
         // subsequent load should succeed despite side effects from import
-        formLoaderTask = new FormLoaderTask(formPath, null, null);
-        wrapper = formLoaderTask.execute(formPath).get();
+        formLoaderTask = new FormLoaderTask(formUri, FormsContract.CONTENT_ITEM_TYPE, null, null, formEntryControllerFactory, mock());
+        wrapper = formLoaderTask.executeSynchronously();
         Assert.assertNotNull(wrapper);
         Assert.assertNotNull(wrapper.getController());
         Assert.assertEquals("expected file modification timestamp to be unchanged", dbLastModified, dbFile.lastModified());

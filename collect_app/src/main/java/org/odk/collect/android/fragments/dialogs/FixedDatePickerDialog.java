@@ -3,15 +3,13 @@ package org.odk.collect.android.fragments.dialogs;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.AttributeSet;
 import android.view.View;
-import android.view.Window;
 import android.widget.DatePicker;
 
 import androidx.annotation.NonNull;
@@ -21,7 +19,6 @@ import androidx.fragment.app.DialogFragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import org.joda.time.LocalDateTime;
-import org.odk.collect.android.R;
 import org.odk.collect.android.logic.DatePickerDetails;
 import org.odk.collect.android.utilities.ThemeUtils;
 import org.odk.collect.android.widgets.utilities.DateTimeWidgetUtils;
@@ -65,22 +62,27 @@ public class FixedDatePickerDialog extends DialogFragment {
         DatePickerDialog dialog = new DatePickerDialog(requireActivity(), viewModel.getDialogTheme(), viewModel.getDateSetListener(),
                 viewModel.getLocalDateTime().getYear(), viewModel.getLocalDateTime().getMonthOfYear() - 1, viewModel.getLocalDateTime().getDayOfMonth());
 
-        if (themeUtils.isHoloDialogTheme(viewModel.getDialogTheme())) {
-            dialog.setTitle(requireContext().getString(R.string.select_date));
+        if (themeUtils.isSpinnerDatePickerDialogTheme(viewModel.getDialogTheme())) {
+            dialog.setTitle(requireContext().getString(org.odk.collect.strings.R.string.select_date));
             fixSpinner(requireContext(), dialog, viewModel.getLocalDateTime().getYear(), viewModel.getLocalDateTime().getMonthOfYear() - 1,
                     viewModel.getLocalDateTime().getDayOfMonth());
             hidePickersIfNeeded(dialog, viewModel.getLocalDateTime());
-
-            Window window = dialog.getWindow();
-            if (window != null) {
-                window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            }
 
             //noinspection deprecation
             dialog.getDatePicker().setCalendarViewShown(false);
         }
 
         return dialog;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // Needed because the DatePickerDialog doesn't pick up theme colors properly for some reason
+        DatePickerDialog dialog = (DatePickerDialog) getDialog();
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setTextColor(new ThemeUtils(getContext()).getColorPrimary());
+        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).setTextColor(new ThemeUtils(getContext()).getColorPrimary());
     }
 
     private void hidePickersIfNeeded(DatePickerDialog dialog, LocalDateTime date) {
@@ -90,7 +92,7 @@ public class FixedDatePickerDialog extends DialogFragment {
 
             dialog.getDatePicker().findViewById(Resources.getSystem().getIdentifier("month", "id", "android"))
                     .setVisibility(View.GONE);
-            dialog.getDatePicker().updateDate(date.getYear(), 1, 1);
+            dialog.getDatePicker().updateDate(date.getYear(), 0, 1);
         } else if (viewModel.getDatePickerDetails().isMonthYearMode()) {
             dialog.getDatePicker().findViewById(Resources.getSystem().getIdentifier("day", "id", "android"))
                     .setVisibility(View.GONE);
@@ -111,7 +113,7 @@ public class FixedDatePickerDialog extends DialogFragment {
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.N) {
             try {
                 // Get the theme's android:datePickerMode
-                final int MODE_SPINNER = 2;
+                final int modeSpinner = 2;
                 Class<?> styleableClass = Class.forName("com.android.internal.R$styleable");
                 Field datePickerStyleableField = styleableClass.getField("DatePicker");
                 int[] datePickerStyleable = (int[]) datePickerStyleableField.get(null);
@@ -119,10 +121,10 @@ public class FixedDatePickerDialog extends DialogFragment {
                         android.R.attr.datePickerStyle, 0);
                 Field datePickerModeStyleableField = styleableClass.getField("DatePicker_datePickerMode");
                 int datePickerModeStyleable = datePickerModeStyleableField.getInt(null);
-                final int mode = a.getInt(datePickerModeStyleable, MODE_SPINNER);
+                final int mode = a.getInt(datePickerModeStyleable, modeSpinner);
                 a.recycle();
 
-                if (mode == MODE_SPINNER) {
+                if (mode == modeSpinner) {
 
                     Field datePickerField = findField(DatePickerDialog.class,
                             DatePicker.class, "mDatePicker");

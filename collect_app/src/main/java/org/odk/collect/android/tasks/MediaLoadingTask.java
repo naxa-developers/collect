@@ -1,101 +1,70 @@
 package org.odk.collect.android.tasks;
 
+import static org.odk.collect.settings.keys.ProjectKeys.KEY_IMAGE_SIZE;
+
 import android.net.Uri;
 import android.os.AsyncTask;
-import androidx.fragment.app.DialogFragment;
-import androidx.fragment.app.Fragment;
 
-import org.odk.collect.android.R;
-import org.odk.collect.android.activities.FormEntryActivity;
+import org.odk.collect.android.activities.FormFillingActivity;
 import org.odk.collect.android.application.Collect;
-import org.odk.collect.android.dao.helpers.ContentResolverHelper;
-import org.odk.collect.android.exception.GDriveConnectionException;
-import org.odk.collect.android.fragments.dialogs.ProgressDialogFragment;
-import org.odk.collect.android.javarosawrapper.FormController;
-import org.odk.collect.android.network.NetworkStateProvider;
+import org.odk.collect.android.injection.DaggerUtils;
+import org.odk.collect.android.utilities.ContentUriHelper;
 import org.odk.collect.android.utilities.FileUtils;
-import org.odk.collect.android.utilities.ImageConverter;
-import org.odk.collect.android.utilities.MediaUtils;
-import org.odk.collect.android.utilities.ToastUtils;
+import org.odk.collect.android.utilities.ImageCompressionController;
 import org.odk.collect.android.widgets.BaseImageWidget;
 import org.odk.collect.android.widgets.QuestionWidget;
+import org.odk.collect.androidshared.ui.DialogFragmentUtils;
+import org.odk.collect.settings.SettingsProvider;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
 
-import timber.log.Timber;
+import javax.inject.Inject;
 
 public class MediaLoadingTask extends AsyncTask<Uri, Void, File> {
 
-    private WeakReference<FormEntryActivity> formEntryActivity;
-    private WeakReference<NetworkStateProvider> connectivityProvider;
+    private final File instanceFile;
+    @Inject
+    SettingsProvider settingsProvider;
 
-    public MediaLoadingTask(FormEntryActivity formEntryActivity, NetworkStateProvider connectivityProvider) {
-        onAttach(formEntryActivity);
-        this.connectivityProvider = new WeakReference<>(connectivityProvider);
+    @Inject
+    ImageCompressionController imageCompressionController;
+
+    private WeakReference<FormFillingActivity> formFillingActivity;
+
+    public MediaLoadingTask(FormFillingActivity formFillingActivity, File instanceFile) {
+        this.instanceFile = instanceFile;
+        onAttach(formFillingActivity);
     }
 
-    public void onAttach(FormEntryActivity formEntryActivity) {
-        this.formEntryActivity = new WeakReference<>(formEntryActivity);
-    }
-
-    public void onDetach() {
-        formEntryActivity = null;
-        connectivityProvider = null;
+    public void onAttach(FormFillingActivity formFillingActivity) {
+        this.formFillingActivity = new WeakReference<>(formFillingActivity);
+        DaggerUtils.getComponent(this.formFillingActivity.get()).inject(this);
     }
 
     @Override
     protected File doInBackground(Uri... uris) {
+        if (instanceFile != null) {
+            String extension = ContentUriHelper.getFileExtensionFromUri(uris[0]);
 
-        File instanceFile;
-        FormController formController = Collect.getInstance().getFormController();
+            File newFile = FileUtils.createDestinationMediaFile(instanceFile.getParent(), extension);
+            FileUtils.saveAnswerFileFromUri(uris[0], newFile, Collect.getInstance());
+            QuestionWidget questionWidget = formFillingActivity.get().getWidgetWaitingForBinaryData();
 
-        if (formController != null) {
-            instanceFile = formController.getInstanceFile();
-            if (instanceFile != null) {
-                String instanceFolder = instanceFile.getParent();
-                String extension = ContentResolverHelper.getFileExtensionFromUri(formEntryActivity.get(), uris[0]);
-                String destMediaPath = instanceFolder
-                        + File.separator
-                        + System.currentTimeMillis()
-                        + "."
-                        + extension;
-
-                try {
-                    File chosenFile = new MediaUtils().getFileFromUri(formEntryActivity.get(), uris[0], connectivityProvider.get());
-                    if (chosenFile != null) {
-                        final File newFile = new File(destMediaPath);
-                        FileUtils.copyFile(chosenFile, newFile);
-                        QuestionWidget questionWidget = formEntryActivity.get().getWidgetWaitingForBinaryData();
-
-                        // apply image conversion if the widget is an image widget
-                        if (questionWidget instanceof BaseImageWidget) {
-                            ImageConverter.execute(newFile.getPath(), questionWidget, formEntryActivity.get());
-                        }
-
-                        return newFile;
-                    } else {
-                        Timber.e("Could not receive chosen file");
-                        formEntryActivity.get().runOnUiThread(() -> ToastUtils.showShortToastInMiddle(R.string.error_occured));
-                        return null;
-                    }
-                } catch (GDriveConnectionException e) {
-                    Timber.e("Could not receive chosen file due to connection problem");
-                    formEntryActivity.get().runOnUiThread(() -> ToastUtils.showLongToastInMiddle(R.string.gdrive_connection_exception));
-                    return null;
-                }
+            // apply image conversion if the widget is an image widget
+            if (questionWidget instanceof BaseImageWidget) {
+                String imageSizeMode = settingsProvider.getUnprotectedSettings().getString(KEY_IMAGE_SIZE);
+                imageCompressionController.execute(newFile.getPath(), questionWidget, formFillingActivity.get(), imageSizeMode);
             }
+            return newFile;
         }
         return null;
-
     }
 
     @Override
     protected void onPostExecute(File result) {
-        Fragment prev = formEntryActivity.get().getSupportFragmentManager().findFragmentByTag(ProgressDialogFragment.COLLECT_PROGRESS_DIALOG_TAG);
-        if (prev != null && !formEntryActivity.get().isInstanceStateSaved()) {
-            ((DialogFragment) prev).dismiss();
-        }
-        formEntryActivity.get().setWidgetData(result);
+        FormFillingActivity activity = this.formFillingActivity.get();
+        DialogFragmentUtils.dismissDialog(FormFillingActivity.TAG_PROGRESS_DIALOG_MEDIA_LOADING, activity.getSupportFragmentManager());
+        activity.setWidgetData(result);
     }
 }

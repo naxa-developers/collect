@@ -16,10 +16,6 @@
 
 package org.odk.collect.android.support.pages;
 
-import androidx.test.rule.ActivityTestRule;
-
-import org.odk.collect.android.R;
-
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.RootMatchers.isDialog;
@@ -27,18 +23,14 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
 public class OkDialog extends Page<OkDialog> {
-    public OkDialog(ActivityTestRule rule) {
-        super(rule);
-    }
 
     @Override
     public OkDialog assertOnPage() {
-        onView(withText(R.string.ok)).inRoot(isDialog()).check(matches(isDisplayed()));
+        onView(withText(org.odk.collect.strings.R.string.ok)).inRoot(isDialog()).check(matches(isDisplayed()));
         return this;
     }
 
     public <D extends Page<D>> D clickOK(D destination) {
-        clickOnId(android.R.id.button1);
-        return destination.assertOnPage();
+        return clickOnButtonInDialog(org.odk.collect.strings.R.string.ok, destination);
     }
 }

@@ -21,7 +21,7 @@ public class ExPrinterWidgetTest extends QuestionWidgetTest<ExPrinterWidget, IAn
     @NonNull
     @Override
     public ExPrinterWidget createWidget() {
-        return new ExPrinterWidget(activity, new QuestionDetails(formEntryPrompt, "formAnalyticsID"), new FakeWaitingForDataRegistry());
+        return new ExPrinterWidget(activity, new QuestionDetails(formEntryPrompt), new FakeWaitingForDataRegistry());
     }
 
     @NonNull
@@ -48,6 +48,6 @@ public class ExPrinterWidgetTest extends QuestionWidgetTest<ExPrinterWidget, IAn
     public void usingReadOnlyOptionShouldMakeAllClickableElementsDisabled() {
         when(formEntryPrompt.isReadOnly()).thenReturn(true);
 
-        assertThat(getSpyWidget().launchIntentButton.getVisibility(), is(View.GONE));
+        assertThat(getSpyWidget().binding.printButton.getVisibility(), is(View.GONE));
     }
 }

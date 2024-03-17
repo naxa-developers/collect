@@ -14,21 +14,21 @@
 
 package org.odk.collect.android.tasks;
 
+import static org.odk.collect.strings.localization.LocalizedApplicationKt.getLocalizedString;
+import static java.util.Collections.emptyMap;
+
 import android.os.AsyncTask;
 
-import org.odk.collect.android.R;
 import org.odk.collect.android.application.Collect;
 import org.odk.collect.android.formmanagement.FormDownloadException;
-import org.odk.collect.android.formmanagement.FormDownloadExceptionMapper;
 import org.odk.collect.android.formmanagement.FormDownloader;
+import org.odk.collect.android.formmanagement.FormsDataService;
 import org.odk.collect.android.formmanagement.ServerFormDetails;
 import org.odk.collect.android.listeners.DownloadFormsTaskListener;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-
-import static java.util.Collections.emptyMap;
 
 /**
  * Background task for downloading a given list of forms. We assume right now that the forms are
@@ -37,9 +37,11 @@ import static java.util.Collections.emptyMap;
  *
  * @author msundt
  * @author carlhartung
+ *
+ * @deprecated Server form should be downloaded using {@link FormsDataService}
  */
 public class DownloadFormsTask extends
-        AsyncTask<ArrayList<ServerFormDetails>, String, Map<ServerFormDetails, String>> {
+        AsyncTask<ArrayList<ServerFormDetails>, String, Map<ServerFormDetails, FormDownloadException>> {
 
     private final FormDownloader formDownloader;
     private DownloadFormsTaskListener stateListener;
@@ -49,8 +51,8 @@ public class DownloadFormsTask extends
     }
 
     @Override
-    protected Map<ServerFormDetails, String> doInBackground(ArrayList<ServerFormDetails>... values) {
-        HashMap<ServerFormDetails, String> results = new HashMap<>();
+    protected Map<ServerFormDetails, FormDownloadException> doInBackground(ArrayList<ServerFormDetails>... values) {
+        HashMap<ServerFormDetails, FormDownloadException> results = new HashMap<>();
 
         int index = 1;
         for (ServerFormDetails serverFormDetails : values[0]) {
@@ -60,7 +62,7 @@ public class DownloadFormsTask extends
                 publishProgress(serverFormDetails.getFormName(), currentFormNumber, totalForms);
 
                 formDownloader.downloadForm(serverFormDetails, count -> {
-                    String message = Collect.getInstance().getString(R.string.form_download_progress,
+                    String message = getLocalizedString(Collect.getInstance(), org.odk.collect.strings.R.string.form_download_progress,
                             serverFormDetails.getFormName(),
                             String.valueOf(count),
                             String.valueOf(serverFormDetails.getManifest().getMediaFiles().size())
@@ -69,11 +71,11 @@ public class DownloadFormsTask extends
                     publishProgress(message, currentFormNumber, totalForms);
                 }, this::isCancelled);
 
-                results.put(serverFormDetails, Collect.getInstance().getString(R.string.success));
-            } catch (FormDownloadException e) {
-                results.put(serverFormDetails, new FormDownloadExceptionMapper(Collect.getInstance()).getMessage(e));
-            } catch (InterruptedException e) {
+                results.put(serverFormDetails, null);
+            } catch (FormDownloadException.DownloadingInterrupted e) {
                 return emptyMap();
+            } catch (FormDownloadException e) {
+                results.put(serverFormDetails, e);
             }
 
             index++;
@@ -83,7 +85,7 @@ public class DownloadFormsTask extends
     }
 
     @Override
-    protected void onCancelled(Map<ServerFormDetails, String> formDetailsStringHashMap) {
+    protected void onCancelled(Map<ServerFormDetails, FormDownloadException> formDetailsStringHashMap) {
         synchronized (this) {
             if (stateListener != null) {
                 stateListener.formsDownloadingCancelled();
@@ -92,7 +94,7 @@ public class DownloadFormsTask extends
     }
 
     @Override
-    protected void onPostExecute(Map<ServerFormDetails, String> value) {
+    protected void onPostExecute(Map<ServerFormDetails, FormDownloadException> value) {
         synchronized (this) {
             if (stateListener != null) {
                 stateListener.formsDownloadingComplete(value);

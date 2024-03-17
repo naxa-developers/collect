@@ -4,128 +4,268 @@
 version: 2
 
 references:
-  workspace: &workspace
-               ~/work
-
   android_config: &android_config
-    working_directory: *workspace
+    working_directory: ~/work
     docker:
-      - image: circleci/android:api-30
+      - image: cimg/android:2024.01
+    resource_class: medium+
 
 jobs:
-  check_quality:
+  compile:
     <<: *android_config
-    environment:
-      GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx1024m" -Dkotlin.compiler.execution.strategy=in-process'
     steps:
       - checkout
-
-      - restore_cache:
-          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "collect_app/build.gradle" }}
       - run:
-          name: Download dependencies
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 androidDependencies
+          name: Generate combined build.gradle file for cache key
+          command: cat build.gradle */build.gradle .circleci/gradle.properties .circleci/config.yml buildSrc/src/main/java/dependencies/Dependencies.kt buildSrc/src/main/java/dependencies/Versions.kt > deps.txt
+      - restore_cache:
+          keys:
+            - compile-deps-{{ checksum "deps.txt" }}
+            - compile-deps-
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - run:
+          name: Copy gradle config
+          command: mkdir -p ~/.gradle && cp .circleci/gradle.properties ~/.gradle/gradle.properties
+
+      - run:
+          name: Download Robolectric deps
+          command: ./download-robolectric-deps.sh
+
+      - run:
+          name: Compile code
+          command: ./gradlew assembleDebug
+
       - save_cache:
           paths:
-            - ~/.gradle
-          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "collect_app/build.gradle" }}
+            - ~/.gradle/wrapper
+          key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - save_cache:
+          paths:
+            - ~/.gradle/caches/modules-2/files-2.1
+          key: compile-deps-{{ checksum "deps.txt" }}
+      - persist_to_workspace:
+          root: ~/work
+          paths:
+            - .
+
+  create_dependency_backup:
+    <<: *android_config
+    steps:
+      - attach_workspace:
+          at: ~/work
+      - restore_cache:
+          keys:
+            - compile-deps-{{ checksum "deps.txt" }}
+            - compile-deps-
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+
+      - run:
+          name: Create Maven repo from dependencies
+          command: ./gradlew cacheToMavenLocal
+      - run:
+          name: Compress Maven repo
+          command: tar -cvzf $(git describe --tags).tar .local-m2
+      - store_artifacts:
+          path: maven.tar
+
+  check_quality:
+    <<: *android_config
+    steps:
+      - attach_workspace:
+          at: ~/work
+      - restore_cache:
+          keys:
+            - compile-deps-{{ checksum "deps.txt" }}
+            - compile-deps-
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+
+      - run:
+          name: Copy gradle config
+          command: mkdir -p ~/.gradle && cp .circleci/gradle.properties ~/.gradle/gradle.properties
 
       - run:
           name: Run code quality checks
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 checkCode
-      - store_artifacts:
-          path: collect_app/build/reports
-          destination: reports
+          command: ./gradlew pmd ktlintCheck checkstyle lintDebug
 
   test_modules:
     <<: *android_config
-    environment:
-      GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx1024m" -Dkotlin.compiler.execution.strategy=in-process'
+    parallelism: 4
     steps:
-      - checkout
-
+      - attach_workspace:
+          at: ~/work
       - restore_cache:
-          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "collect_app/build.gradle" }}
-      - run:
-          name: Download dependencies
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 androidDependencies
-      - save_cache:
-          paths:
-            - ~/.gradle
-          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "collect_app/build.gradle" }}
+          keys:
+            - test-modules-deps-{{ checksum "deps.txt" }}
+            - test-modules-deps-
+            - compile-deps-
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
 
       - run:
-          name: Run async unit tests
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 async:testDebug
-      - run:
-          name: Run strings unit tests
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 strings:testDebug
-      - run:
-          name: Run material unit tests
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 material:testDebug
-      - run:
-          name: Run audioclips unit tests
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 audioclips:testDebug
-      - run:
-          name: Run audiorecorder unit tests
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 audiorecorder:testDebug
+          name: Copy gradle config
+          command: mkdir -p ~/.gradle && cp .circleci/gradle.properties ~/.gradle/gradle.properties
 
-      - store_artifacts:
-          path: collect_app/build/reports
-          destination: reports
+      - run:
+          name: Generate list of modules for this fork
+          command: |
+            cat .circleci/test_modules.txt | circleci tests split > .circleci/fork_test_modules.txt && \
+            echo "Modules for this fork:" && \
+            cat .circleci/fork_test_modules.txt
+
+      - run:
+          name: Run module unit tests
+          command: |
+            ./gradlew $(cat .circleci/fork_test_modules.txt | awk '{for (i=1; i<=NF; i++) printf "%s:testDebug ",$i}')
+
       - store_test_results:
           path: collect_app/build/test-results
+
+      - save_cache:
+          paths:
+            - ~/.gradle/caches/modules-2/files-2.1
+          key: test-modules-deps-{{ checksum "deps.txt" }}
 
   test_app:
     <<: *android_config
-    environment:
-      GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx1024m" -Dkotlin.compiler.execution.strategy=in-process'
+    parallelism: 4
     steps:
-      - checkout
-
+      - attach_workspace:
+          at: ~/work
       - restore_cache:
-          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "collect_app/build.gradle" }}
+          keys:
+            - test-app-deps-{{ checksum "deps.txt" }}
+            - test-app-deps-
+            - compile-deps-
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+
       - run:
-          name: Download dependencies
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 androidDependencies
-      - save_cache:
-          paths:
-            - ~/.gradle
-          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "collect_app/build.gradle" }}
+          name: Copy gradle config
+          command: mkdir -p ~/.gradle && cp .circleci/gradle.properties ~/.gradle/gradle.properties
+
+      - run:
+          name: Generate list of test classes
+          command: .circleci/generate-app-test-list.sh
+
+      - run:
+          name: Generate list of tests for this fork
+          command: |
+            cat .circleci/collect_app_test_classes.txt | circleci tests split > .circleci/fork_test_classes.txt && \
+            echo "Tests for this fork:" && \
+            cat .circleci/fork_test_classes.txt && \
+            echo "" && \
+            echo "Will run command:" && \
+            echo "./gradlew collect_app:testDebug $(cat .circleci/fork_test_classes.txt | awk '{for (i=1; i<=NF; i++) printf "--tests %s ",$i}')"
 
       - run:
           name: Run app unit tests
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 collect_app:testDebug
+          command: |
+            ./gradlew collect_app:testDebug $(cat .circleci/fork_test_classes.txt | awk '{for (i=1; i<=NF; i++) printf "--tests %s ",$i}')
+
       - store_artifacts:
           path: collect_app/build/reports
           destination: reports
       - store_test_results:
           path: collect_app/build/test-results
 
-      - run:
-          name: Assemble connected test build
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 assembleDebugAndroidTest
-
-  test_instrumented:
-    <<: *android_config
-    environment:
-      GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx1024m" -Dkotlin.compiler.execution.strategy=in-process'
-    steps:
-      - checkout
-
-      - restore_cache:
-          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "collect_app/build.gradle" }}
-      - run:
-          name: Download dependencies
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 androidDependencies
       - save_cache:
           paths:
-            - ~/.gradle
-          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "collect_app/build.gradle" }}
+            - ~/.gradle/caches/modules-2/files-2.1
+          key: test-app-deps-{{ checksum "deps.txt" }}
+
+  build_instrumented:
+    <<: *android_config
+    steps:
+      - attach_workspace:
+          at: ~/work
+      - restore_cache:
+          keys:
+            - intrumented-deps-{{ checksum "deps.txt" }}
+            - intrumented-deps-
+            - compile-deps-
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+
+      - run:
+          name: Copy gradle config
+          command: mkdir -p ~/.gradle && cp .circleci/gradle.properties ~/.gradle/gradle.properties
+
+      - run:
+          name: Assemble connected test build
+          command: ./gradlew assembleDebugAndroidTest
+
+      - save_cache:
+          paths:
+            - ~/.gradle/caches/modules-2/files-2.1
+          key: intrumented-deps-{{ checksum "deps.txt" }}
+
+  build_release:
+    <<: *android_config
+    steps:
+      - attach_workspace:
+          at: ~/work
+      - restore_cache:
+          keys:
+            - compile-deps-{{ checksum "deps.txt" }}
+            - compile-deps
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+
+      - run:
+          name: Copy gradle config
+          command: mkdir -p ~/.gradle && cp .circleci/gradle.properties ~/.gradle/gradle.properties
+
+      - run:
+          name: Assemble self signed release build
+          command: ./gradlew assembleSelfSignedRelease
+
+      - run:
+          name: Check APK size isn't larger than 10.8MB
+          command: if [ $(ls -l collect_app/build/outputs/apk/selfSignedRelease/*.apk | awk '{print $5}') -gt 10800000 ]; then exit 1; fi
+
+      - run:
+          name: Copy APK to predictable path for artifact storage
+          command: cp collect_app/build/outputs/apk/selfSignedRelease/*.apk selfSignedRelease.apk
+      - store_artifacts:
+          path: selfSignedRelease.apk
+
+  test_smoke_instrumented:
+    <<: *android_config
+    steps:
+      - attach_workspace:
+          at: ~/work
+      - restore_cache:
+          keys:
+            - intrumented-deps-{{ checksum "deps.txt" }}
+            - intrumented-deps
+            - compile-deps-
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+
+      - run:
+          name: Copy gradle config
+          command: mkdir -p ~/.gradle && cp .circleci/gradle.properties ~/.gradle/gradle.properties
 
       - run:
           name: Assemble test build
-          command: ./gradlew -PdisablePreDex --no-daemon --max-workers=2 assembleDebug assembleDebugAndroidTest
+          command: ./gradlew assembleDebug assembleDebugAndroidTest
+
+      - save_cache:
+          paths:
+            - ~/.gradle/caches/modules-2/files-2.1
+          key: intrumented-deps-{{ checksum "deps.txt" }}
+
       - run:
           name: Authorize gcloud
           command: |
@@ -140,28 +280,115 @@ jobs:
             if [[ "$CIRCLE_PROJECT_USERNAME" == "getodk" ]]; then \
               echo "y" | gcloud beta firebase test android run \
               --type instrumentation \
-              --num-uniform-shards=50 \
               --app collect_app/build/outputs/apk/debug/*.apk \
               --test collect_app/build/outputs/apk/androidTest/debug/*.apk \
-              --device model=Pixel2,version=28,locale=en,orientation=portrait \
+              --device model=MediumPhone.arm,version=30,locale=en,orientation=portrait \
               --results-bucket opendatakit-collect-test-results \
-              --environment-variables coverage=true,coverageFile=/sdcard/coverage.ec \
+              --directories-to-pull /sdcard --timeout 20m \
+              --test-targets "package org.odk.collect.android.feature.smoke"
+            fi
+          no_output_timeout: 25m
+
+  test_instrumented:
+    <<: *android_config
+    steps:
+      - attach_workspace:
+          at: ~/work
+      - restore_cache:
+          keys:
+            - intrumented-deps-{{ checksum "deps.txt" }}
+            - intrumented-deps
+            - compile-deps-
+      - restore_cache:
+          keys:
+            - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+
+      - run:
+          name: Copy gradle config
+          command: mkdir -p ~/.gradle && cp .circleci/gradle.properties ~/.gradle/gradle.properties
+
+      - run:
+          name: Assemble test build
+          command: ./gradlew assembleDebug assembleDebugAndroidTest
+
+      - save_cache:
+          paths:
+            - ~/.gradle/caches/modules-2/files-2.1
+          key: intrumented-deps-{{ checksum "deps.txt" }}
+
+      - run:
+          name: Authorize gcloud
+          command: |
+            if [[ "$CIRCLE_PROJECT_USERNAME" == "getodk" ]]; then \
+              gcloud config set project api-project-322300403941
+              echo $GCLOUD_SERVICE_KEY | base64 --decode > client-secret.json
+              gcloud auth activate-service-account --key-file client-secret.json
+            fi
+      - run:
+          name: Run integration tests
+          command: |
+            if [[ "$CIRCLE_PROJECT_USERNAME" == "getodk" ]]; then \
+              echo "y" | gcloud beta firebase test android run \
+              --type instrumentation \
+              --num-uniform-shards=25 \
+              --app collect_app/build/outputs/apk/debug/*.apk \
+              --test collect_app/build/outputs/apk/androidTest/debug/*.apk \
+              --device model=MediumPhone.arm,version=30,locale=en,orientation=portrait \
+              --results-bucket opendatakit-collect-test-results \
               --directories-to-pull /sdcard --timeout 20m
             fi
-          no_output_timeout: 60m
+          no_output_timeout: 25m
 
 workflows:
   version: 2
-  workflow:
+  commit:
     jobs:
-      - check_quality
-      - test_modules
-      - test_app
-      - test_instrumented:
+      - compile
+      - create_dependency_backup:
           requires:
-            - check_quality
-            - test_modules
-            - test_app
+            - compile
+          filters:
+            tags:
+              only: /^v((20)[0-9]{2})\.\d+\.\d+$/ # matches semvers like v1.2.3
+            branches:
+              ignore: /.*/
+      - check_quality:
+          requires:
+            - compile
+      - test_modules:
+          requires:
+            - compile
+      - test_app:
+          requires:
+            - compile
+      - build_release:
+          requires:
+            - compile
+      - build_instrumented:
+          requires:
+            - compile
           filters:
             branches:
-              only: master
+              ignore:
+                - master
+      - test_smoke_instrumented:
+          requires:
+            - compile
+          filters:
+            branches:
+              only:
+                - master
+
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * 1-5"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - compile
+      - test_instrumented:
+          requires:
+            - compile

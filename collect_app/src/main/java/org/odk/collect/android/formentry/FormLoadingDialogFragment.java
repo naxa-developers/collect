@@ -18,11 +18,10 @@ package org.odk.collect.android.formentry;
 
 import android.content.Context;
 
-import org.odk.collect.android.R;
 import org.odk.collect.android.formentry.saving.SaveFormProgressDialogFragment;
-import org.odk.collect.android.fragments.dialogs.ProgressDialogFragment;
+import org.odk.collect.material.MaterialProgressDialogFragment;
 
-public class FormLoadingDialogFragment extends ProgressDialogFragment {
+public class FormLoadingDialogFragment extends MaterialProgressDialogFragment {
 
     public interface FormLoadingDialogFragmentListener {
         void onCancelFormLoading();
@@ -40,8 +39,8 @@ public class FormLoadingDialogFragment extends ProgressDialogFragment {
     public void onAttach(Context context) {
         super.onAttach(context);
 
-        setTitle(getString(R.string.loading_form));
-        setMessage(getString(R.string.please_wait));
+        setTitle(getString(org.odk.collect.strings.R.string.loading_form));
+        setMessage(getString(org.odk.collect.strings.R.string.please_wait));
         setCancelable(false);
 
         if (context instanceof FormLoadingDialogFragmentListener) {
@@ -51,11 +50,11 @@ public class FormLoadingDialogFragment extends ProgressDialogFragment {
 
     @Override
     protected String getCancelButtonText() {
-        return getString(R.string.cancel_loading_form);
+        return getString(org.odk.collect.strings.R.string.cancel_loading_form);
     }
 
     @Override
-    protected Cancellable getCancellable() {
+    protected OnCancelCallback getOnCancelCallback() {
         return () -> {
             listener.onCancelFormLoading();
             return true;
